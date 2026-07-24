@@ -18,6 +18,8 @@ const state = {
 	tab: "dashboard",
 	exerciseNames: [],
 	selectedExercise: null,
+	programData: null,
+	programDay: "A",
 };
 
 function todayISO() {
@@ -137,6 +139,7 @@ function setTab(tab) {
 
 function refreshActiveTab() {
 	if (state.tab === "dashboard") renderDashboard();
+	if (state.tab === "program") renderProgram();
 	if (state.tab === "journal") renderJournal();
 	if (state.tab === "workouts") renderWorkouts();
 	if (state.tab === "macros") renderMacros();
@@ -612,6 +615,292 @@ async function renderMacros() {
 			await api(`/api/macros/${btn.dataset.deleteMacro}`, { method: "DELETE" });
 			renderMacros();
 		});
+	});
+}
+
+// ---------- program ----------
+async function loadProgram() {
+	if (!state.programData) {
+		state.programData = await api("/program.json");
+	}
+	return state.programData;
+}
+
+function buildDraftFromProgramDay(day) {
+	const exercises = [];
+
+	day.blocks.forEach((block) => {
+		block.exercises.forEach((ex) => {
+			exercises.push({
+				name: ex.name,
+				sets: Array.from({ length: ex.sets || 1 }, () => ({
+					reps: ex.reps != null ? String(ex.reps) : "",
+					weight: "",
+					unit: /kg/i.test(ex.load || "") ? "kg" : "lb",
+					rpe: "",
+				})),
+			});
+		});
+	});
+
+	if (day.finisher) {
+		day.finisher.moves.forEach((move) => {
+			exercises.push({
+				name: move.name,
+				sets: Array.from({ length: move.sets || 1 }, () => ({
+					reps: move.reps != null ? String(move.reps) : "",
+					weight: "",
+					unit: "lb",
+					rpe: "",
+				})),
+			});
+		});
+	}
+
+	return {
+		date: state.date,
+		name: `Day ${day.id} — ${day.title}`,
+		notes: day.intent,
+		exercises: exercises.length
+			? exercises
+			: [{ name: "", sets: [{ reps: "", weight: "", unit: "lb", rpe: "" }] }],
+	};
+}
+
+function renderTempoHtml(tempo) {
+	return `
+		<div class="card">
+			<div class="program-tempo">
+				<span class="program-tempo-label muted">${escapeHtml(tempo.label)}</span>
+				${tempo.items.map((i) => `<span>${escapeHtml(i)}</span>`).join("")}
+			</div>
+		</div>`;
+}
+
+function renderProgramExerciseHtml(ex) {
+	return `
+		<div class="program-ex">
+			<div class="program-ex-header">
+				<div class="program-ex-name">${escapeHtml(ex.name)}</div>
+				<div class="program-ex-stats">
+					<strong>${escapeHtml(ex.repsLabel || `${ex.sets}×${ex.reps}`)}</strong>
+					${ex.load ? escapeHtml(ex.load) : ""}<br/>
+					${ex.rest ? escapeHtml(ex.rest) : ""}
+				</div>
+			</div>
+			${ex.cue ? `<div class="program-ex-cue">${ex.cue}</div>` : ""}
+			${ex.note ? `<div class="program-ex-note">${escapeHtml(ex.note)}</div>` : ""}
+		</div>`;
+}
+
+function renderProgramBlockHtml(block) {
+	const exercisesHtml = block.exercises.map(renderProgramExerciseHtml).join("");
+
+	if (block.supersetHeader) {
+		return `
+			<div class="card">
+				<div class="program-section-label">${escapeHtml(block.label)}</div>
+				${block.tempo ? renderTempoHtml(block.tempo) : ""}
+				<div class="program-superset">
+					<div class="program-superset-header">${escapeHtml(block.supersetHeader)}</div>
+					${exercisesHtml}
+				</div>
+			</div>`;
+	}
+
+	return `
+		<div class="card">
+			<div class="program-section-label">${escapeHtml(block.label)}</div>
+			<div style="display:flex;flex-direction:column;gap:0.5rem;">${exercisesHtml}</div>
+		</div>`;
+}
+
+async function renderProgramDayHtml(day) {
+	let banner = "";
+	try {
+		const dash = await api(`/api/dashboard?date=${state.date}`);
+		const score = dash.oura?.readiness?.score;
+		if (typeof score === "number") {
+			const tier = score >= 85 ? "green" : score >= 70 ? "yellow" : "red";
+			const label = tier === "green"
+				? "Full Send — execute as written, add load if RPE was 7 or below last time."
+				: tier === "yellow"
+				? "Modified — primary compounds only, skip supersets and the finisher."
+				: "Recovery Day — no lifting. Easy walk + restorative yoga instead.";
+			banner = `<div class="program-readiness-banner ${tier}">Readiness ${score} for ${formatDateLabel(state.date)} → <strong>${label}</strong></div>`;
+		}
+	} catch {
+		// Oura not connected or dashboard unreachable — skip the banner
+	}
+
+	const warmup = `
+		<div class="card">
+			<div class="program-section-label">${escapeHtml(day.warmup.label)}</div>
+			<div class="program-warmup-grid">
+				${day.warmup.items.map((w) => `
+					<div class="program-warmup-card">
+						<div class="program-badge">${escapeHtml(w.badge)}</div>
+						<div style="font-weight:600;font-size:0.85rem;margin-bottom:0.2rem;">${escapeHtml(w.name)}</div>
+						<div class="muted" style="font-size:0.78rem;">${escapeHtml(w.detail)}</div>
+					</div>
+				`).join("")}
+			</div>
+		</div>`;
+
+	const tempoBlock = day.tempo ? renderTempoHtml(day.tempo) : "";
+	const blocks = day.blocks.map(renderProgramBlockHtml).join("");
+
+	const finisher = day.finisher
+		? `
+		<div class="card">
+			<div class="program-section-label">${escapeHtml(day.finisher.label)}</div>
+			<div class="program-finisher-moves">
+				${day.finisher.moves.map((m) => `
+					<div class="program-finisher-move">
+						<strong>${escapeHtml(m.name)}</strong>
+						<span>${escapeHtml(m.detail)}</span>
+					</div>`).join("")}
+			</div>
+		</div>`
+		: "";
+
+	return `
+		<div class="card day-${day.id}">
+			<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;">
+				<div style="display:flex;gap:1rem;align-items:baseline;">
+					<div class="program-day-letter">${escapeHtml(day.id)}</div>
+					<div>
+						<div style="font-size:1.15rem;font-weight:700;">${escapeHtml(day.title)}</div>
+						<div class="muted" style="font-size:0.78rem;margin-top:0.2rem;">${escapeHtml(day.duration)} · ${escapeHtml(day.focus)} · ${escapeHtml(day.metaLabel)}: ${escapeHtml(day.metaValue)}</div>
+					</div>
+				</div>
+				<button class="primary" id="start-program-day">Start this workout →</button>
+			</div>
+			${banner ? `<div style="margin-top:0.75rem;">${banner}</div>` : ""}
+			<div class="program-intent" style="margin-top:0.9rem;">${escapeHtml(day.intent)}</div>
+		</div>
+		${warmup}
+		${tempoBlock}
+		${blocks}
+		${finisher}
+		<div class="card">
+			<div class="program-section-label">Post-Session Recovery</div>
+			<div style="font-weight:600;margin-bottom:0.3rem;">${escapeHtml(day.recovery.title)}</div>
+			<div class="muted" style="font-size:0.85rem;line-height:1.6;">${escapeHtml(day.recovery.text)}</div>
+		</div>
+	`;
+}
+
+function renderProgramReferenceHtml(ref) {
+	const ouraGrid = `
+		<div class="card">
+			<div class="program-section-label">Oura Readiness Protocol · All Three Days</div>
+			<div class="program-oura-grid">
+				${ref.ouraProtocol.map((o) => `
+					<div class="program-oura-cell">
+						<div class="program-oura-score ${o.tier}">${escapeHtml(o.score)}</div>
+						<div class="muted" style="font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.4rem;">${escapeHtml(o.title)}</div>
+						<div class="program-oura-text">${escapeHtml(o.text)}</div>
+					</div>`).join("")}
+			</div>
+		</div>`;
+
+	const rules = `
+		<div class="card">
+			<div class="program-section-label">Flexible Scheduling Rules</div>
+			<ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:0.4rem;">
+				${ref.schedulingRules.map((r) => `<li class="muted" style="font-size:0.85rem;">${escapeHtml(r)}</li>`).join("")}
+			</ul>
+		</div>`;
+
+	const progression = `
+		<div class="card">
+			<div class="program-section-label">12-Week Progression</div>
+			<div style="display:flex;flex-direction:column;gap:0.6rem;">
+				${ref.progression.map((p) => `
+					<div class="program-phase">
+						<div class="program-phase-weeks">${escapeHtml(p.weeks)}</div>
+						<div>
+							<div class="program-phase-name tier-${p.tier}">${escapeHtml(p.name)}</div>
+							<div class="program-phase-desc">${escapeHtml(p.desc)}</div>
+						</div>
+					</div>`).join("")}
+			</div>
+		</div>`;
+
+	const supplements = `
+		<div class="card">
+			<div class="program-section-label">Supplement Stack</div>
+			<table style="width:100%;border-collapse:collapse;">
+				${ref.supplements.map((s) => `
+					<tr style="border-bottom:1px solid var(--border);">
+						<td style="padding:0.5rem 0.75rem 0.5rem 0;font-weight:600;font-size:0.85rem;width:35%;vertical-align:top;">${escapeHtml(s.name)}</td>
+						<td style="padding:0.5rem 0;color:var(--text-dim);font-size:0.8rem;line-height:1.5;vertical-align:top;">${escapeHtml(s.detail)}</td>
+					</tr>`).join("")}
+			</table>
+		</div>`;
+
+	const equipment = `
+		<div class="card">
+			<div class="program-section-label">Garage Gym Equipment</div>
+			<div class="program-ref-grid">
+				${ref.equipment.map((cat) => `
+					<div class="program-warmup-card">
+						<div style="font-weight:600;font-size:0.82rem;margin-bottom:0.5rem;">${escapeHtml(cat.category)}</div>
+						<div style="display:flex;flex-direction:column;gap:0.4rem;">
+							${cat.items.map((i) => `<div class="muted" style="font-size:0.78rem;"><strong style="color:var(--text);">${escapeHtml(i.name)}</strong> — ${escapeHtml(i.detail)}</div>`).join("")}
+						</div>
+					</div>`).join("")}
+			</div>
+		</div>`;
+
+	const footer = `<div class="muted" style="font-size:0.78rem;text-align:center;">${escapeHtml(ref.footer)}</div>`;
+
+	return ouraGrid + rules + progression + supplements + equipment + footer;
+}
+
+async function renderProgram() {
+	const container = document.getElementById("view-program");
+	container.innerHTML = `<div class="muted">Loading…</div>`;
+
+	const program = await loadProgram();
+
+	container.innerHTML = `
+		<div class="card">
+			<div class="muted" style="font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;">${escapeHtml(program.meta.eyebrow)}</div>
+			<div style="font-size:1.4rem;font-weight:700;margin-top:0.2rem;">${escapeHtml(program.meta.title)}</div>
+			<div style="margin-top:0.6rem;display:flex;flex-wrap:wrap;gap:0.4rem;">
+				${program.meta.pills.map((p) => `<span class="pill">${escapeHtml(p)}</span>`).join("")}
+			</div>
+			<div class="program-day-nav" style="margin-top:0.9rem;">
+				${["A", "B", "C"].map((id) => `<button data-day="${id}" class="${state.programDay === id ? "active" : ""}">Day ${id}</button>`).join("")}
+				<button data-day="ref" class="${state.programDay === "ref" ? "active" : ""}">Reference</button>
+			</div>
+		</div>
+		<div id="program-body"></div>
+	`;
+
+	container.querySelectorAll(".program-day-nav button").forEach((btn) => {
+		btn.addEventListener("click", () => {
+			state.programDay = btn.dataset.day;
+			renderProgram();
+		});
+	});
+
+	const body = document.getElementById("program-body");
+
+	if (state.programDay === "ref") {
+		body.innerHTML = renderProgramReferenceHtml(program.reference);
+		return;
+	}
+
+	const day = program.days.find((d) => d.id === state.programDay);
+	body.innerHTML = await renderProgramDayHtml(day);
+
+	body.querySelector("#start-program-day")?.addEventListener("click", () => {
+		workoutDraft = buildDraftFromProgramDay(day);
+		setTab("workouts");
+		toast(`Day ${day.id} loaded into Workouts — fill in actual weights as you lift.`);
 	});
 }
 
