@@ -1,0 +1,245 @@
+{
+	"meta": {
+		"eyebrow": "Garage Strength Program · 3-Day Split · June 2026",
+		"title": "Strength & Definition",
+		"pills": [
+			"CF-L1 · 15 Years",
+			"200HR RYT",
+			"FAI + Labral Repair · R Hip · 2017",
+			"GLP-1 Protocol",
+			"Oura Readiness Governed",
+			"−37 lb Since Oct 2024"
+		]
+	},
+	"days": [
+		{
+			"id": "A",
+			"title": "Glutes & Posterior Chain",
+			"duration": "~50 min",
+			"focus": "Glute Hypertrophy",
+			"metaLabel": "Priority",
+			"metaValue": "Asymmetry Correction",
+			"intent": "Hip thrusts and RDLs are the two movements that will drive the majority of visible glute change. Everything else is accessory. Progressive overload above all else — beat last session's performance in at least one lift. Right side first on every unilateral movement, every set, every time.",
+			"warmup": {
+				"label": "Warm-Up · 8 min · Do Not Skip",
+				"items": [
+					{ "badge": "2×12", "name": "Glute Bridge March (BW)", "detail": "Neurological activation before loading. Low back flat, posterior pelvic tilt." },
+					{ "badge": "10 each", "name": "90/90 Hip Switches", "detail": "Hip surgery awareness — move within comfortable range only. Assess asymmetry side to side. No forcing." },
+					{ "badge": "2×8 · 25 lb KB", "name": "KB Romanian Deadlift", "detail": "Intentionally light — you're grooving the pattern, not loading it." }
+				]
+			},
+			"blocks": [
+				{
+					"label": "Primary Compound · 4 Sets Each",
+					"exercises": [
+						{ "name": "Barbell Hip Thrust", "cue": "Your #1 glute builder. Full lockout, <b>1-sec pause at peak</b>. Drive load up weekly — this is the movement to own. Bench under shoulder blades, bar padded across hips.", "sets": 4, "reps": 10, "repsLabel": "4 × 10", "load": "63–93 lb", "rest": "90 sec" },
+						{ "name": "Barbell Romanian Deadlift", "cue": "Bar tracks close to legs, soft knee, hinge deep. <b>Feel hamstring load before initiating return.</b> This is a hip hinge, not a squat.", "sets": 4, "reps": 10, "repsLabel": "4 × 10", "load": "63–93 lb", "rest": "90 sec" }
+					]
+				},
+				{
+					"label": "Unilateral Work · Asymmetry Priority · Right Side First Every Set",
+					"exercises": [
+						{ "name": "Single-Leg Romanian Deadlift (KB)", "cue": "<b>Right side first every set. 3-count eccentric.</b> Ipsilateral KB hold — same hand as working leg. This is your InBody asymmetry correction exercise. The gap is closing — keep the work consistent.", "note": "↳ InBody asymmetry correction — track RPE difference side to side each session", "sets": 3, "reps": 10, "repsLabel": "3 × 10 each", "load": "25–35 lb KB", "rest": "75 sec" },
+						{ "name": "Dumbbell Bulgarian Split Squat", "cue": "Rear foot on bench. <b>Right leg forward first.</b> Self-govern depth — no impingement. Compare RPE side to side each session. Slow eccentric.", "note": "↳ FAI awareness — depth is self-governed, no forcing", "sets": 3, "reps": 8, "repsLabel": "3 × 8 each", "load": "10–15 lb DBs", "rest": "75 sec" }
+					]
+				},
+				{
+					"label": "Superset · 3 Rounds · Minimal Rest Between A1 and A2",
+					"supersetHeader": "A1 → A2 → 60 sec rest · Repeat × 3",
+					"exercises": [
+						{ "name": "A1 · KB Sumo Deadlift", "cue": "Wide stance, toes out. Drives glute med and adductors alongside glute max. Hinge, don't squat.", "sets": 3, "reps": 12, "repsLabel": "12 reps", "load": "35–53 lb KB", "rest": "→ A2" },
+						{ "name": "A2 · DB Glute Kickback (Bench Supported)", "cue": "DB tucked behind knee. <b>Full hip extension, hard squeeze at top.</b> Keep hips square to bench.", "sets": 3, "reps": 15, "repsLabel": "15 each", "load": "10–15 lb DB", "rest": "60 sec" }
+					]
+				}
+			],
+			"finisher": {
+				"label": "Day A Finisher · Readiness 85+ Only",
+				"moves": [
+					{ "name": "Wall Ball Squat Toss", "detail": "14 lb · 3×10 — power through the hips", "sets": 3, "reps": 10, "load": "14 lb" },
+					{ "name": "BW Glute Bridge Burnout", "detail": "Abmat · 2×25 — squeeze every rep", "sets": 2, "reps": 25, "load": "Bodyweight (Abmat)" }
+				]
+			},
+			"recovery": {
+				"title": "Restorative Yoga + Pranayama · 10–15 min",
+				"text": "Legs-up-the-wall, supported bridge, supta baddha konasana. 4-7-8 breath or box breathing. This is your HRV tool — not an optional cooldown. Use it."
+			}
+		},
+		{
+			"id": "B",
+			"title": "Upper Body & Arm Definition",
+			"duration": "~45 min",
+			"focus": "Strength Foundation",
+			"metaLabel": "Key",
+			"metaValue": "3-Count Eccentric on All Isolation",
+			"intent": "Day B is your strength-biased upper day. Compound press and pull at heavier loads build the foundation that Day C then defines. The 3-count eccentric on curls and tricep work is non-negotiable — the eccentric is where definition is built, not the concentric.",
+			"warmup": {
+				"label": "Warm-Up · 5 min",
+				"items": [
+					{ "badge": "2×10", "name": "Scapular Push-Ups", "detail": "Serratus activation and scapular stability before pressing. Protract and retract only — no elbow bend." },
+					{ "badge": "5 each", "name": "Shoulder CARs", "detail": "Controlled Articular Rotations. Full shoulder ROM prep. Slow and deliberate — you know how to do this." }
+				]
+			},
+			"blocks": [
+				{
+					"label": "Primary Compound · Press + Pull",
+					"exercises": [
+						{ "name": "Barbell Overhead Press", "cue": "Strict — no leg drive. Builds shoulder caps and triceps — the two muscles most visible in arm definition. <b>Drive load weekly.</b> Bar starts at collarbone, press to full lockout.", "sets": 4, "reps": 8, "repsLabel": "4 × 8", "load": "43–53 lb", "rest": "90 sec" },
+						{ "name": "Barbell Bent-Over Row", "cue": "45° hinge, pull to lower rib. Back thickness and bicep strength from the pull side. <b>Controls posterior chain fatigue from Day A.</b> Squeeze at top, controlled lower.", "sets": 4, "reps": 10, "repsLabel": "4 × 10", "load": "53–73 lb", "rest": "90 sec" },
+						{ "name": "Dumbbell Bench Press", "cue": "Full ROM on your flat bench. Neutral or pronated grip. Chest + tricep compound to complement the press pattern. <b>3-count lower.</b>", "sets": 3, "reps": 12, "repsLabel": "3 × 12", "load": "15–20 lb DBs", "rest": "75 sec" }
+					]
+				},
+				{
+					"label": "Superset B1/B2 · Bicep + Tricep · 3 Rounds · 3-Count Eccentric on Both",
+					"tempo": { "label": "Tempo", "items": ["3 count lower", "1 sec pause", "1 count lift", "1 sec squeeze at top"] },
+					"supersetHeader": "B1 → B2 → 60 sec rest · Repeat × 3",
+					"exercises": [
+						{ "name": "B1 · Barbell Bicep Curl", "cue": "<b>3-count lower. No swing.</b> This builds the visible bicep peak — the eccentric is where the growth is. Elbows stay at sides.", "sets": 3, "reps": 12, "repsLabel": "12 reps", "load": "33–43 lb", "rest": "→ B2" },
+						{ "name": "B2 · KB Overhead Tricep Extension", "cue": "25 lb KB, both hands. <b>Elbows in tight. Full lockout at top.</b> Long head activation — most visible part of the tricep. 3-count lower.", "sets": 3, "reps": 15, "repsLabel": "15 reps", "load": "25 lb KB", "rest": "60 sec" }
+					]
+				},
+				{
+					"label": "Superset C1/C2 · Shoulder + Core · 3 Rounds",
+					"supersetHeader": "C1 → C2 → 60 sec rest · Repeat × 3",
+					"exercises": [
+						{ "name": "C1 · Dumbbell Lateral Raise", "cue": "Lead with elbow, raise to shoulder height only. <b>3-count lower.</b> Medial delt is the muscle that creates shoulder width and cap definition. No swinging.", "sets": 3, "reps": 12, "repsLabel": "12 reps", "load": "10 lb DBs", "rest": "→ C2" },
+						{ "name": "C2 · KB Renegade Row", "cue": "25 lb KBs in plank. Row one side at a time. <b>Core + back + bicep.</b> Hips stay square — don't rotate to cheat the row.", "sets": 3, "reps": 8, "repsLabel": "8 each", "load": "25 lb KBs", "rest": "60 sec" }
+					]
+				}
+			],
+			"finisher": {
+				"label": "Day B Finisher · Readiness 85+ Only",
+				"moves": [
+					{ "name": "DB Hammer Curls", "detail": "15–20 lb · 3×10 · slow eccentric", "sets": 3, "reps": 10, "load": "15–20 lb DBs" },
+					{ "name": "Bench Tricep Dips", "detail": "BW · 2×15–20", "sets": 2, "reps": 18, "repsLabel": "2×15–20", "load": "Bodyweight" },
+					{ "name": "Single-Arm DB Press", "detail": "15–20 lb · 2×10 each · standing", "sets": 2, "reps": 10, "repsLabel": "2×10 each", "load": "15–20 lb DB" }
+				]
+			},
+			"recovery": {
+				"title": "Restorative Yoga + Pranayama · 10–15 min",
+				"text": "Thread the needle, supported fish, eagle arms seated. 4-7-8 breath. Non-negotiable on this program — it's part of the HRV strategy."
+			}
+		},
+		{
+			"id": "C",
+			"title": "Arms, Shoulders & Core Definition",
+			"duration": "25–30 min",
+			"focus": "Definition & Detail",
+			"metaLabel": "Systemic Load",
+			"metaValue": "Low",
+			"intent": "Day B builds the foundation — compound strength, heavier loads. Day C is where you chisel it. Higher reps, tempo-controlled isolation, shorter rest. The goal is local stimulus without systemic cost. This session should never leave you too fatigued to hit OTF or BBC the next day. No finisher — this session is the finisher.",
+			"warmup": {
+				"label": "Warm-Up · 5 min",
+				"items": [
+					{ "badge": "30 sec each direction", "name": "Arm Circles + Cross-Body Swings", "detail": "Full shoulder range. Build heat before loading the delts." },
+					{ "badge": "5 each", "name": "Shoulder CARs", "detail": "Same as Day B opener. Slow and deliberate through full ROM." },
+					{ "badge": "2×15 · light band", "name": "Band Pull-Aparts", "detail": "Rear delt and external rotation prep. Until bands arrive: doorframe chest stretch 30 sec each side." },
+					{ "badge": "6 reps", "name": "Dead Bug", "detail": "Opposite arm and leg. Slow. Core activation before loading. Low back pinned to floor." }
+				]
+			},
+			"tempo": { "label": "Tempo Key", "items": ["3 count lower (eccentric)", "1 sec pause at bottom", "1 count lift (concentric)", "1 sec squeeze at top"] },
+			"blocks": [
+				{
+					"label": "Shoulders · Medial Delt Width + Rear Delt Detail",
+					"exercises": [
+						{ "name": "DB Arnold Press — Seated on Bench", "cue": "Start palms facing you, rotate to palms forward as you press. Full delt sweep — front, medial, and rear all fire through the rotation. <b>3-count lower only.</b> Don't rush the eccentric.", "sets": 3, "reps": 10, "repsLabel": "3 × 10", "load": "15–20 lb DBs", "rest": "75 sec" }
+					]
+				},
+				{
+					"label": "Shoulders · Medial Delt Width + Rear Delt Detail",
+					"supersetHeader": "Superset S1 · 3 Rounds · S1A → S1B → 60 sec rest",
+					"exercises": [
+						{ "name": "S1A · DB Lateral Raise", "cue": "Lead with elbow, raise to shoulder height only. <b>3-count lower, 1-sec pause at bottom before next rep.</b> Medial delt isolation — creates visible shoulder width. No swinging.", "note": "↗ Upgrade: banded lateral raise once bands arrive — superior tension at peak", "sets": 3, "reps": 15, "repsLabel": "15 reps", "load": "10 lb DBs", "rest": "→ S1B" },
+						{ "name": "S1B · Rear Delt DB Fly (Bench Supported)", "cue": "Seated, hinge forward until chest is near thighs. Arms hang, slight bend in elbow. Raise out to sides, lead with elbows. <b>Squeeze rear delts at top, 3-count lower.</b> Creates the 3D shoulder cap.", "note": "↗ Upgrade: banded face pull once bands arrive — more natural line of pull", "sets": 3, "reps": 12, "repsLabel": "12 reps", "load": "8–10 lb DBs", "rest": "60 sec" }
+					]
+				},
+				{
+					"label": "Arms · Bicep Peak + Tricep Long Head",
+					"supersetHeader": "Superset S2 · 3 Rounds · S2A → S2B → S2C → 75 sec rest · 3-Count Eccentric on All",
+					"exercises": [
+						{ "name": "S2A · Seated DB Curl — Long Head Emphasis", "cue": "Sit at edge of flat bench, slight rear lean. Let arm hang slightly behind hip at bottom — stretches the long head in a way the standing barbell curl cannot reach. <b>Squeeze 1 sec at top, 3-count lower.</b> No momentum.", "sets": 3, "reps": 12, "repsLabel": "12 reps", "load": "15–20 lb DBs", "rest": "→ S2B" },
+						{ "name": "S2B · Sandbag Overhead Tricep Extension", "cue": "Standing. Both hands grip sandbag behind head, elbows in tight. <b>Full lockout at top, 1-sec squeeze.</b> 3-count lower. Sandbag instability increases long head demand vs. the KB on Day B — this is your progression bridge.", "sets": 3, "reps": 15, "repsLabel": "15 reps", "load": "25 lb sandbag", "rest": "→ S2C" },
+						{ "name": "S2C · DB Hammer Curl", "cue": "Neutral grip. Hits brachialis and brachioradialis — pushes the bicep up and creates forearm definition. <b>3-count lower, no swing.</b> Alternate arms or bilateral.", "note": "↗ Upgrade: banded hammer curl once bands arrive — constant tension through full ROM", "sets": 3, "reps": 10, "repsLabel": "10 reps", "load": "15–20 lb DBs", "rest": "75 sec" }
+					]
+				},
+				{
+					"label": "Arms · Bicep Peak + Tricep Long Head",
+					"exercises": [
+						{ "name": "Bench Tricep Dip", "cue": "Hands on bench edge behind you, feet extended. Lower until upper arms are parallel — <b>3-count lower, full lockout at top.</b> Elevate feet on KB or sandbag to increase difficulty.", "sets": 3, "reps": 15, "repsLabel": "3 × 15", "load": "Bodyweight", "rest": "60 sec" }
+					]
+				},
+				{
+					"label": "Core · Anti-Rotation + Lateral Definition",
+					"exercises": [
+						{ "name": "KB Suitcase Carry", "cue": "One hand, walk 20 steps, switch. <b>Stay tall — do not lean toward the weight.</b> Obliques and QL working isometrically to resist lateral bend. Right side first — hip asymmetry awareness. This is the lateral waist definition exercise.", "note": "↳ Right side first every set", "sets": 3, "reps": 20, "repsLabel": "3 × 20 steps", "load": "35 lb KB", "rest": "45 sec" }
+					]
+				},
+				{
+					"label": "Core · Anti-Rotation + Lateral Definition",
+					"supersetHeader": "Superset S3 · 3 Rounds · S3A → S3B → 60 sec rest",
+					"exercises": [
+						{ "name": "S3A · Dead Bug", "cue": "Opposite arm and leg extend slowly to floor — <b>4-count lower, 1-sec pause before return.</b> Low back stays pinned the entire time. Anti-extension core — trains deep stabilizers without hip flexor dominance.", "sets": 3, "reps": 8, "repsLabel": "8 each side", "load": "Bodyweight", "rest": "→ S3B" },
+						{ "name": "S3B · KB Plank Pull-Through", "cue": "High plank. 25 lb KB to one side. Reach under, drag KB to opposite side. <b>Hips stay square — resist rotation.</b> Anti-rotation under load develops the oblique shelf. Alternate sides each rep.", "sets": 3, "reps": 8, "repsLabel": "8 each side", "load": "25 lb KB", "rest": "60 sec" }
+					]
+				}
+			],
+			"recovery": {
+				"title": "Restorative Yoga + Pranayama · 10 min",
+				"text": "Thread the needle, supported fish, eagle arms seated. 4-7-8 breath or box breathing. Day C's lower systemic load means your nervous system has more capacity to absorb the parasympathetic shift — use it."
+			}
+		}
+	],
+	"reference": {
+		"ouraProtocol": [
+			{ "tier": "green", "score": "85+", "title": "Full Send", "text": "Execute the session exactly as written. This is your day to add load — if all sets felt RPE 7 or below last session, add 5 lb to barbells. Progressive overload happens on green days." },
+			{ "tier": "yellow", "score": "70–84", "title": "Modified", "text": "Primary compounds only. Skip supersets and finishers. Keep post-session restorative. Don't add load — maintain what you built. Still a productive session." },
+			{ "tier": "red", "score": "<70", "title": "Recovery Day", "text": "No lifting. 20–30 min easy walk + 20 min restorative yoga. Your nervous system is under load — adding more suppresses the HRV you're trying to build. Rest is the training today." }
+		],
+		"schedulingRules": [
+			"Never lift two days back to back — any combination of A, B, or C",
+			"Day A, B, and C can run in any order based on your week",
+			"A heavy BBC upper body day counts as a buffer — don't run Day B or C the following day",
+			"If you only get two sessions in a week, prioritize A and B — Day C is the first to drop",
+			"Oura Readiness governs load on all three days — no exceptions"
+		],
+		"progression": [
+			{ "weeks": "WKS 1–4", "tier": 1, "name": "Foundation", "desc": "Learn your numbers. Keep RPE at 7/10 maximum. Add 5 lb to barbell lifts only when all sets feel like RPE 7 or below with 1–2 reps in reserve. Log every session. Check Oura daily. Prioritize the post-session restorative — this is where you build your HRV baseline. Goal: Readiness consistently above 75." },
+			{ "weeks": "WKS 5–8", "tier": 2, "name": "Build", "desc": "Add tempo work — 3-count eccentric, 1-sec pause, 1-count concentric on hip thrusts and curls. Increase barbell loads 5–10 lb where form is solid. Introduce drop sets on the B1/B2 superset final round and S2 on Day C. Goal: Oura Readiness averaging 80+ consistently." },
+			{ "weeks": "WKS 9–12", "tier": 3, "name": "Define", "desc": "Reduce rest periods to 60 sec on all accessory work. Full drop sets on hip thrusts, curls, lateral raises. Test near-max on barbell hip thrust and RDL — this is your benchmark. Re-scan InBody at week 12 to measure skeletal muscle change and assess asymmetry progress." }
+		],
+		"supplements": [
+			{ "name": "Ascent Native Whey", "detail": "Post-workout. 30–40g per serve. Don't rely on appetite — GLP-1 suppresses hunger. Protein is mechanical, not intuitive." },
+			{ "name": "Naked Casein", "detail": "Pre-bed via Ninja Creami. Eat immediately after you get home — don't wait until 10–11pm." },
+			{ "name": "Creatine Monohydrate", "detail": "3–5g in morning lemon water. Mix and drink immediately — citric acid degrades creatine if it sits. On pre-workout days: 2–3g only (pre-workout has 1g)." },
+			{ "name": "Moon Juice Magnesi-Om", "detail": "1 tsp in water nightly. Add tart cherry juice for Sleepy Girl Mocktail — natural melatonin support." },
+			{ "name": "Naked Energy Pre-Workout", "detail": "Weekend morning workouts only. 200mg caffeine — do not use before evening sessions." },
+			{ "name": "Vital Proteins Collagen", "detail": "Daily. Connective tissue support relevant to hip repair history." },
+			{ "name": "Rx Cholecalciferol (D3)", "detail": "As prescribed. Do not add OTC Vitamin D — you're covered." },
+			{ "name": "Omega-3 Fish Oil", "detail": "1–2g EPA+DHA daily with food. Discuss with prescribing physician given Effexor — complementary, not conflicting, but worth flagging. Not yet confirmed." }
+		],
+		"equipment": [
+			{ "category": "Barbells + Plates", "items": [
+				{ "name": "33 lb barbell", "detail": "With plates — lighter press work" },
+				{ "name": "45 lb barbell", "detail": "With plates — primary loading" }
+			]},
+			{ "category": "Kettlebells", "items": [
+				{ "name": "25 lb", "detail": "RDL warmup, pull-throughs, carries" },
+				{ "name": "35 lb", "detail": "Sumo DL, suitcase carry" },
+				{ "name": "53 lb", "detail": "Heavy sumo option (readiness dependent)" }
+			]},
+			{ "category": "Dumbbells + Other", "items": [
+				{ "name": "8–20 lb set", "detail": "All isolation work" },
+				{ "name": "25 lb sandbag", "detail": "Day C tricep extension" },
+				{ "name": "14 lb wall ball", "detail": "Day A finisher" },
+				{ "name": "Flat bench", "detail": "Press, dips, split squat, seated curls" },
+				{ "name": "Squat rack", "detail": "Barbell work" },
+				{ "name": "Abmat", "detail": "Glute bridge burnout" }
+			]},
+			{ "category": "Bands (Order Soon)", "items": [
+				{ "name": "Loop bands", "detail": "Light / medium / heavy — lateral raises, pull-aparts" },
+				{ "name": "Handled bands", "detail": "Face pulls, hammer curls, tricep pushdowns" },
+				{ "name": "Recommended", "detail": "Fit Simplify loop set + handled set" }
+			]}
+		],
+		"footer": "Built for Maegan · June 2026 · InBody + Oura + CF-L1 + 200HR RYT"
+	}
+}

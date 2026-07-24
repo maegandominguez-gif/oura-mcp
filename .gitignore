@@ -1,6 +1,9 @@
 # builds
 oura-mcp-dist
 
+# fitness tracker local data
+tracker/tracker-data.json
+
 # Logs
 logs
 *.log

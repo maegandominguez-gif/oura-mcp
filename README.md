@@ -162,6 +162,13 @@ deno task dev
 deno task build
 ```
 
+## Fitness Tracker App
+
+This repo also includes [`tracker/`](tracker/README.md) — a local, interactive
+fitness journal (workouts, macros, daily journal notes) that pulls in your
+Oura readiness/sleep/activity data alongside what you log by hand. See
+[`tracker/README.md`](tracker/README.md) for setup.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
