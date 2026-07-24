@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Fitness Journal</title>
+	<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+	<header class="app-header">
+		<h1>🏋️ Fitness Journal</h1>
+		<div class="date-nav">
+			<button id="prev-day" aria-label="Previous day">‹</button>
+			<span id="date-label"></span>
+			<input type="date" id="date-input" />
+			<button id="next-day" aria-label="Next day">›</button>
+			<button id="today-btn">Today</button>
+		</div>
+	</header>
+
+	<nav class="tabs">
+		<button data-tab="dashboard" class="active">Dashboard</button>
+		<button data-tab="journal">Journal</button>
+		<button data-tab="workouts">Workouts</button>
+		<button data-tab="macros">Macros</button>
+	</nav>
+
+	<main>
+		<section id="view-dashboard" class="view active"></section>
+		<section id="view-journal" class="view"></section>
+		<section id="view-workouts" class="view"></section>
+		<section id="view-macros" class="view"></section>
+	</main>
+
+	<div id="toast" class="toast"></div>
+
+	<script src="/app.js"></script>
+</body>
+</html>
