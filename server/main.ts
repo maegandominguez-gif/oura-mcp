@@ -36,12 +36,12 @@ const startServer = (): FastMCP => {
 				throw new Response(null, { status: 400, statusText: 'Bad Request: Missing Bearer Token' });
 			}
 
-			const sessionToken = authorization.slice(7);
+			const bearerToken = authorization.slice(7);
 
-			// Look up the Oura access token for this session
-			const accessToken = await tokenStore.getAccessToken(sessionToken);
+			// Try as a session token first, fall back to using it directly as an Oura access token
+			let accessToken = await tokenStore.getAccessToken(bearerToken);
 			if (!accessToken) {
-				throw new Response(null, { status: 401, statusText: 'Unauthorized: unknown or expired session' });
+				accessToken = bearerToken;
 			}
 
 			const api = new OuraApi(accessToken);
