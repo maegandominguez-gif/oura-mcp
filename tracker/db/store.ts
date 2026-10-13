@@ -1,6 +1,5 @@
-// A tiny JSON-file backed store. This is a single-user local app tracking a
-// personal fitness journal, so a whole-file read/write is simpler and more
-// dependable than pulling in a native SQLite binding.
+// Deno KV backed store. KV works the same locally (a sqlite file) and on
+// Deno Deploy (a hosted database), so the app runs unchanged in both places.
 
 export type SetEntry = {
 	reps: number | null;
@@ -19,6 +18,7 @@ export type WorkoutEntry = {
 	date: string;
 	name: string;
 	notes: string | null;
+	readiness: number | null;
 	created_at: string;
 	exercises: ExerciseEntry[];
 };
@@ -44,42 +44,93 @@ export type MacroEntry = {
 	created_at: string;
 };
 
-type Store = {
-	journal: Record<string, JournalEntry>;
-	workouts: WorkoutEntry[];
-	macros: MacroEntry[];
-	nextWorkoutId: number;
-	nextMacroId: number;
-};
+// Locally KV is a file at KV_PATH; on Deno Deploy openKv() takes no path and
+// connects to the database attached to the project.
+const onDeploy = Boolean(Deno.env.get("DENO_DEPLOYMENT_ID"));
+export const kv = await Deno.openKv(onDeploy ? undefined : Deno.env.get("KV_PATH") || "./tracker.kv");
 
-const DB_PATH = Deno.env.get("DB_PATH") || "./tracker-data.json";
-
-function defaultStore(): Store {
-	return { journal: {}, workouts: [], macros: [], nextWorkoutId: 1, nextMacroId: 1 };
+async function listAll<T>(prefix: Deno.KvKey): Promise<T[]> {
+	const items: T[] = [];
+	for await (const entry of kv.list<T>({ prefix })) {
+		items.push(entry.value);
+	}
+	return items;
 }
 
-function loadStore(): Store {
-	try {
-		const raw = Deno.readTextFileSync(DB_PATH);
-		const parsed = JSON.parse(raw);
-		return { ...defaultStore(), ...parsed };
-	} catch (err) {
-		if (err instanceof Deno.errors.NotFound) {
-			return defaultStore();
-		}
-		throw err;
+/** Returns the next id for a collection; the check() makes concurrent calls retry rather than collide. */
+async function nextId(collection: string): Promise<number> {
+	const key = ["counters", collection];
+	while (true) {
+		const current = await kv.get<number>(key);
+		const next = (current.value ?? 0) + 1;
+		const result = await kv.atomic().check(current).set(key, next).commit();
+		if (result.ok) return next;
 	}
 }
 
-export const store: Store = loadStore();
+// workouts
+export async function listWorkoutEntries(): Promise<WorkoutEntry[]> {
+	return await listAll<WorkoutEntry>(["workouts"]);
+}
 
-let writeChain: Promise<void> = Promise.resolve();
+export async function getWorkoutEntry(id: number): Promise<WorkoutEntry | null> {
+	return (await kv.get<WorkoutEntry>(["workouts", id])).value;
+}
 
-/** Persists the current store to disk. Calls are serialized so concurrent
- * mutations never race each other or interleave writes to the file. */
-export function save(): Promise<void> {
-	writeChain = writeChain.then(() =>
-		Deno.writeTextFile(DB_PATH, JSON.stringify(store, null, 2))
-	);
-	return writeChain;
+export async function insertWorkoutEntry(data: Omit<WorkoutEntry, "id" | "created_at">): Promise<WorkoutEntry> {
+	const workout: WorkoutEntry = {
+		id: await nextId("workouts"),
+		created_at: new Date().toISOString(),
+		...data,
+	};
+	await kv.set(["workouts", workout.id], workout);
+	return workout;
+}
+
+export async function putWorkoutEntry(workout: WorkoutEntry): Promise<void> {
+	await kv.set(["workouts", workout.id], workout);
+}
+
+export async function deleteWorkoutEntry(id: number): Promise<void> {
+	await kv.delete(["workouts", id]);
+}
+
+// macros
+export async function listMacroEntries(): Promise<MacroEntry[]> {
+	return await listAll<MacroEntry>(["macros"]);
+}
+
+export async function getMacroEntry(id: number): Promise<MacroEntry | null> {
+	return (await kv.get<MacroEntry>(["macros", id])).value;
+}
+
+export async function insertMacroEntry(data: Omit<MacroEntry, "id" | "created_at">): Promise<MacroEntry> {
+	const macro: MacroEntry = {
+		id: await nextId("macros"),
+		created_at: new Date().toISOString(),
+		...data,
+	};
+	await kv.set(["macros", macro.id], macro);
+	return macro;
+}
+
+export async function deleteMacroEntry(id: number): Promise<void> {
+	await kv.delete(["macros", id]);
+}
+
+// journal (one entry per date)
+export async function listJournalEntriesAll(): Promise<JournalEntry[]> {
+	return await listAll<JournalEntry>(["journal"]);
+}
+
+export async function getJournalEntryByDate(date: string): Promise<JournalEntry | null> {
+	return (await kv.get<JournalEntry>(["journal", date])).value;
+}
+
+export async function putJournalEntry(entry: JournalEntry): Promise<void> {
+	await kv.set(["journal", entry.date], entry);
+}
+
+export async function deleteJournalEntryByDate(date: string): Promise<void> {
+	await kv.delete(["journal", date]);
 }

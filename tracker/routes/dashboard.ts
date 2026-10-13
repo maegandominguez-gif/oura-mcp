@@ -1,4 +1,4 @@
-import { store } from "../db/store.ts";
+import { getJournalEntryByDate, listMacroEntries, listWorkoutEntries } from "../db/store.ts";
 import { getOuraClient } from "../oura.ts";
 import { jsonResponse } from "../utils/http.ts";
 
@@ -9,11 +9,16 @@ function todayISO(): string {
 export async function getDashboard(url: URL): Promise<Response> {
 	const date = url.searchParams.get("date") || todayISO();
 
-	const journal = store.journal[date] ?? null;
-	const workouts = store.workouts
+	const [journal, allWorkouts, allMacros, client] = await Promise.all([
+		getJournalEntryByDate(date),
+		listWorkoutEntries(),
+		listMacroEntries(),
+		getOuraClient(),
+	]);
+	const workouts = allWorkouts
 		.filter((w) => w.date === date)
 		.sort((a, b) => a.id - b.id);
-	const macros = store.macros
+	const macros = allMacros
 		.filter((m) => m.date === date)
 		.sort((a, b) => a.id - b.id);
 
@@ -27,7 +32,6 @@ export async function getDashboard(url: URL): Promise<Response> {
 		{ calories: 0, protein: 0, carbs: 0, fat: 0 },
 	);
 
-	const client = getOuraClient();
 	let oura: Record<string, unknown> = { connected: false };
 
 	if (client) {

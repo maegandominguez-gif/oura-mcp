@@ -240,7 +240,7 @@ label {
 
 .set-row {
 	display: grid;
-	grid-template-columns: 2rem 1fr 1fr 1fr auto;
+	grid-template-columns: 2rem 1fr 1fr 1fr 1fr auto;
 	gap: 0.4rem;
 	align-items: center;
 }
@@ -440,6 +440,8 @@ canvas.chart {
 .program-ex-cue { font-size: 0.82rem; color: var(--text-dim); line-height: 1.55; }
 .program-ex-cue b { color: var(--text); font-weight: 600; }
 .program-ex-note { font-size: 0.75rem; color: var(--accent); font-weight: 500; }
+.program-ex-progress { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.3rem; }
+.program-ex-progress strong { color: var(--text); }
 
 .program-superset {
 	border: 1px solid var(--border);

@@ -2,6 +2,8 @@ import { FastMCP } from "fastmcp";
 import { OuraApi } from "./client/client.ts";
 import { mcpLogger } from "./utils/logger.ts";
 import { wrapToolExecution } from "./utils/tool-wrapper.ts";
+import { generateAuthURL, exchangeCodeForToken } from "./utils/auth.ts";
+import { tokenStore } from "./utils/token-store.ts";
 import * as http from "node:http";
 
 import * as v from 'valibot';
@@ -21,57 +23,42 @@ const startServer = (): FastMCP => {
 		authenticate: async (request: http.IncomingMessage): Promise<SessionData> => {
 			const headers = request.headers ?? {}
 
-			// grab the api key
 			const getHeaderString = (header: string | string[] | undefined) =>
-				Array.isArray(header) ? header.join(", ") : (header ?? "N/A");
+				Array.isArray(header) ? header.join(", ") : (header ?? "");
 
 			// @ts-ignore: this is fine
 			const authorization = getHeaderString(headers['authorization']);
 			if (!authorization) {
-				throw new Response(null, {
-					status: 401,
-					statusText: 'Unauthroized'
-				})
+				throw new Response(null, { status: 401, statusText: 'Unauthorized' });
 			}
 
-			// check if the bearer keyword is included
-			if (!authorization.toLowerCase().includes('bearer ')) {
-				throw new Response(null, {
-					status: 400,
-					statusText: 'Bad Request: Missing Bearer Token'
-				})
+			if (!authorization.toLowerCase().startsWith('bearer ')) {
+				throw new Response(null, { status: 400, statusText: 'Bad Request: Missing Bearer Token' });
 			}
 
-			// pull out the API key
-			const apiKey = authorization.slice(7);
+			const bearerToken = authorization.slice(7);
 
-			// create the api client
-			const api = new OuraApi(apiKey);
+			// Try as a session token first, fall back to using it directly as an Oura access token
+			let accessToken = await tokenStore.getAccessToken(bearerToken);
+			if (!accessToken) {
+				accessToken = bearerToken;
+			}
 
-			// ensure the api can grab user information and extract email
+			const api = new OuraApi(accessToken);
+
 			let personalInfo;
 			try {
 				personalInfo = await api.getPersonalInfo();
-			} catch (err) {
-				throw new Response(null, {
-					status: 401,
-					statusText: 'Unauthroized'
-				})
+			} catch {
+				throw new Response(null, { status: 401, statusText: 'Unauthorized' });
 			}
 
-			// Generate session ID and extract user email
 			const sessionId = crypto.randomUUID();
 			const userEmail = personalInfo.email;
 
-			// Log session creation
 			mcpLogger.logSessionCreated(sessionId, userEmail);
 
-			// Authentication logic
-			return {
-				api: api,
-				sessionId: sessionId,
-				userEmail: userEmail
-			};
+			return { api, sessionId, userEmail };
 		},
 		health: {
 			enabled: true,
@@ -237,12 +224,66 @@ const startServer = (): FastMCP => {
 }
 
 
-// Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
+function startOAuthServer() {
+	const mcpPort = parseInt(Deno.env.get('PORT') || '3000');
+	const authPort = parseInt(Deno.env.get('AUTH_PORT') || '3001');
+
+	Deno.serve({ port: authPort, hostname: '0.0.0.0' }, async (req) => {
+		const url = new URL(req.url);
+
+		if (url.pathname === '/auth/login') {
+			const state = crypto.randomUUID();
+			tokenStore.addPendingState(state);
+			return Response.redirect(generateAuthURL(state), 302);
+		}
+
+		if (url.pathname === '/auth/callback') {
+			const code = url.searchParams.get('code');
+			const state = url.searchParams.get('state');
+			const error = url.searchParams.get('error');
+
+			if (error) {
+				return new Response(`OAuth error: ${error}`, { status: 400 });
+			}
+			if (!code || !state) {
+				return new Response('Missing code or state', { status: 400 });
+			}
+			if (!tokenStore.consumePendingState(state)) {
+				return new Response('Invalid or expired state', { status: 400 });
+			}
+
+			try {
+				const tokenData = await exchangeCodeForToken(code);
+				const sessionToken = crypto.randomUUID();
+				tokenStore.store(sessionToken, tokenData);
+
+				const html = `<!DOCTYPE html>
+<html><body style="font-family:sans-serif;max-width:700px;margin:40px auto;padding:0 20px">
+<h2>✅ Connected to Oura!</h2>
+<p>Your session token (use as Bearer token for MCP connections):</p>
+<pre style="background:#f0f0f0;padding:12px;word-break:break-all;border-radius:6px">${sessionToken}</pre>
+<p>Add to Claude Code:</p>
+<pre style="background:#f0f0f0;padding:12px;border-radius:6px">claude mcp add oura --transport http http://localhost:${mcpPort}/mcp --header "Authorization: Bearer ${sessionToken}"</pre>
+</body></html>`;
+				return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				return new Response(`Token exchange failed: ${msg}`, { status: 500 });
+			}
+		}
+
+		return new Response('Not found', { status: 404 });
+	});
+
+	console.log(`Auth server running on http://localhost:${authPort}`);
+	console.log(`  Login: http://localhost:${authPort}/auth/login`);
+}
+
 if (import.meta.main) {
-	// setup the server
 	const server = startServer();
 
-	// start the server
+	startOAuthServer();
+
 	await server.start({
 		transportType: 'httpStream',
 		httpStream: {

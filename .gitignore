@@ -3,6 +3,7 @@ oura-mcp-dist
 
 # fitness tracker local data
 tracker/tracker-data.json
+tracker/tracker.kv*
 
 # Logs
 logs

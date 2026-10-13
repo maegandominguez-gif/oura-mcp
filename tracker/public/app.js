@@ -394,6 +394,7 @@ async function renderWorkouts() {
 					date: workoutDraft.date,
 					name: workoutDraft.name,
 					notes: workoutDraft.notes || null,
+					readiness: workoutDraft.readiness ?? null,
 					exercises: workoutDraft.exercises
 						.filter((e) => e.name.trim())
 						.map((e) => ({
@@ -441,14 +442,14 @@ function renderWorkoutListItem(w) {
 			<div class="list-item-header">
 				<span class="title">${escapeHtml(w.name)}</span>
 				<span>
-					<span class="muted">${formatDateLabel(w.date)}</span>
+					<span class="muted">${formatDateLabel(w.date)}${w.readiness != null ? ` · Readiness ${w.readiness}` : ""}</span>
 					<button class="icon-btn" data-delete-workout="${w.id}">Delete</button>
 				</span>
 			</div>
 			${w.exercises.map((e) => `
 				<div class="muted">
 					<strong>${escapeHtml(e.name)}</strong>:
-					${e.sets.map((s) => `${s.reps ?? "?"}×${s.weight ?? "?"}${s.unit}`).join(", ") || "no sets logged"}
+					${e.sets.map((s) => `${s.reps ?? "?"}×${s.weight ?? "?"}${s.unit}${s.rpe != null ? ` @${s.rpe}` : ""}`).join(", ") || "no sets logged"}
 				</div>
 			`).join("")}
 			${w.notes ? `<div class="muted">${escapeHtml(w.notes)}</div>` : ""}
@@ -472,6 +473,7 @@ function renderExerciseBlocks() {
 						<option value="lb" ${set.unit === "lb" ? "selected" : ""}>lb</option>
 						<option value="kg" ${set.unit === "kg" ? "selected" : ""}>kg</option>
 					</select>
+					<input type="number" placeholder="RPE" min="1" max="10" step="0.5" value="${set.rpe}" data-set-field="rpe" data-ei="${ei}" data-si="${si}" />
 					<button class="icon-btn" data-remove-set="${ei}:${si}">✕</button>
 				</div>
 			`).join("")}
@@ -626,17 +628,30 @@ async function loadProgram() {
 	return state.programData;
 }
 
-function buildDraftFromProgramDay(day) {
+// The last session's top weight and today's target for each exercise on a day,
+// plus that date's readiness. See progression() in routes/workouts.ts.
+async function loadProgression(day) {
+	const params = new URLSearchParams({ date: state.date });
+	day.blocks.forEach((block) => block.exercises.forEach((ex) => params.append("name", ex.name)));
+	try {
+		return await api(`/api/progression?${params}`);
+	} catch {
+		return { readiness: null, targets: {} };
+	}
+}
+
+function buildDraftFromProgramDay(day, prog) {
 	const exercises = [];
 
 	day.blocks.forEach((block) => {
 		block.exercises.forEach((ex) => {
+			const target = prog.targets[ex.name];
 			exercises.push({
 				name: ex.name,
 				sets: Array.from({ length: ex.sets || 1 }, () => ({
 					reps: ex.reps != null ? String(ex.reps) : "",
-					weight: "",
-					unit: /kg/i.test(ex.load || "") ? "kg" : "lb",
+					weight: target?.target != null ? String(target.target) : "",
+					unit: target?.last ? target.unit : /kg/i.test(ex.load || "") ? "kg" : "lb",
 					rpe: "",
 				})),
 			});
@@ -661,6 +676,7 @@ function buildDraftFromProgramDay(day) {
 		date: state.date,
 		name: `Day ${day.id} — ${day.title}`,
 		notes: day.intent,
+		readiness: prog.readiness,
 		exercises: exercises.length
 			? exercises
 			: [{ name: "", sets: [{ reps: "", weight: "", unit: "lb", rpe: "" }] }],
@@ -677,7 +693,19 @@ function renderTempoHtml(tempo) {
 		</div>`;
 }
 
-function renderProgramExerciseHtml(ex) {
+function renderProgressionHtml(target) {
+	if (!target) return "";
+	if (!target.last) return `<div class="program-ex-progress">No weighted sets logged yet</div>`;
+	const { last, unit } = target;
+	const rpe = last.maxRpe != null ? ` @ RPE ${last.maxRpe}` : "";
+	return `
+		<div class="program-ex-progress">
+			Last: ${last.weight} ${unit}${rpe} (${formatDateLabel(last.date)}) → Today: <strong>${target.target} ${unit}</strong>
+			· ${escapeHtml(target.reason)}
+		</div>`;
+}
+
+function renderProgramExerciseHtml(ex, targets) {
 	return `
 		<div class="program-ex">
 			<div class="program-ex-header">
@@ -690,11 +718,12 @@ function renderProgramExerciseHtml(ex) {
 			</div>
 			${ex.cue ? `<div class="program-ex-cue">${ex.cue}</div>` : ""}
 			${ex.note ? `<div class="program-ex-note">${escapeHtml(ex.note)}</div>` : ""}
+			${/bodyweight/i.test(ex.load || "") ? "" : renderProgressionHtml(targets[ex.name])}
 		</div>`;
 }
 
-function renderProgramBlockHtml(block) {
-	const exercisesHtml = block.exercises.map(renderProgramExerciseHtml).join("");
+function renderProgramBlockHtml(block, targets) {
+	const exercisesHtml = block.exercises.map((ex) => renderProgramExerciseHtml(ex, targets)).join("");
 
 	if (block.supersetHeader) {
 		return `
@@ -715,22 +744,17 @@ function renderProgramBlockHtml(block) {
 		</div>`;
 }
 
-async function renderProgramDayHtml(day) {
+function renderProgramDayHtml(day, prog) {
 	let banner = "";
-	try {
-		const dash = await api(`/api/dashboard?date=${state.date}`);
-		const score = dash.oura?.readiness?.score;
-		if (typeof score === "number") {
-			const tier = score >= 85 ? "green" : score >= 70 ? "yellow" : "red";
-			const label = tier === "green"
-				? "Full Send — execute as written, add load if RPE was 7 or below last time."
-				: tier === "yellow"
-				? "Modified — primary compounds only, skip supersets and the finisher."
-				: "Recovery Day — no lifting. Easy walk + restorative yoga instead.";
-			banner = `<div class="program-readiness-banner ${tier}">Readiness ${score} for ${formatDateLabel(state.date)} → <strong>${label}</strong></div>`;
-		}
-	} catch {
-		// Oura not connected or dashboard unreachable — skip the banner
+	const score = prog.readiness;
+	if (typeof score === "number") {
+		const tier = score >= 85 ? "green" : score >= 70 ? "yellow" : "red";
+		const label = tier === "green"
+			? "Full Send — execute as written, add load if RPE was 7 or below last time."
+			: tier === "yellow"
+			? "Modified — primary compounds only, skip supersets and the finisher."
+			: "Recovery Day — no lifting. Easy walk + restorative yoga instead.";
+		banner = `<div class="program-readiness-banner ${tier}">Readiness ${score} for ${formatDateLabel(state.date)} → <strong>${label}</strong></div>`;
 	}
 
 	const warmup = `
@@ -748,7 +772,7 @@ async function renderProgramDayHtml(day) {
 		</div>`;
 
 	const tempoBlock = day.tempo ? renderTempoHtml(day.tempo) : "";
-	const blocks = day.blocks.map(renderProgramBlockHtml).join("");
+	const blocks = day.blocks.map((block) => renderProgramBlockHtml(block, prog.targets)).join("");
 
 	const finisher = day.finisher
 		? `
@@ -895,12 +919,13 @@ async function renderProgram() {
 	}
 
 	const day = program.days.find((d) => d.id === state.programDay);
-	body.innerHTML = await renderProgramDayHtml(day);
+	const prog = await loadProgression(day);
+	body.innerHTML = renderProgramDayHtml(day, prog);
 
 	body.querySelector("#start-program-day")?.addEventListener("click", () => {
-		workoutDraft = buildDraftFromProgramDay(day);
+		workoutDraft = buildDraftFromProgramDay(day, prog);
 		setTab("workouts");
-		toast(`Day ${day.id} loaded into Workouts — fill in actual weights as you lift.`);
+		toast(`Day ${day.id} loaded into Workouts with today's targets. Log RPE on every set.`);
 	});
 }
 
