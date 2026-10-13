@@ -1,5 +1,4 @@
-import { save, store } from "../db/store.ts";
-import type { MacroEntry } from "../db/store.ts";
+import { deleteMacroEntry, getMacroEntry, insertMacroEntry, listMacroEntries } from "../db/store.ts";
 import { jsonResponse, errorResponse } from "../utils/http.ts";
 
 type MacroInput = {
@@ -12,11 +11,11 @@ type MacroInput = {
 	notes?: string;
 };
 
-export function listMacros(url: URL): Response {
+export async function listMacros(url: URL): Promise<Response> {
 	const from = url.searchParams.get("from");
 	const to = url.searchParams.get("to");
 
-	let macros = store.macros;
+	let macros = await listMacroEntries();
 	if (from && to) {
 		macros = macros.filter((m) => m.date >= from && m.date <= to);
 	}
@@ -31,8 +30,7 @@ export async function createMacro(req: Request): Promise<Response> {
 		return errorResponse("date is required (YYYY-MM-DD)", 400);
 	}
 
-	const macro: MacroEntry = {
-		id: store.nextMacroId++,
+	const macro = await insertMacroEntry({
 		date: body.date,
 		label: body.label ?? null,
 		calories: body.calories ?? null,
@@ -40,28 +38,23 @@ export async function createMacro(req: Request): Promise<Response> {
 		carbs: body.carbs ?? null,
 		fat: body.fat ?? null,
 		notes: body.notes ?? null,
-		created_at: new Date().toISOString(),
-	};
+	});
 
-	store.macros.push(macro);
-	await save();
 	return jsonResponse(macro, 201);
 }
 
 export async function deleteMacro(id: number): Promise<Response> {
-	const index = store.macros.findIndex((m) => m.id === id);
-	if (index === -1) return errorResponse("macro entry not found", 404);
+	if (!await getMacroEntry(id)) return errorResponse("macro entry not found", 404);
 
-	store.macros.splice(index, 1);
-	await save();
+	await deleteMacroEntry(id);
 	return jsonResponse({ ok: true });
 }
 
-export function macroSummary(url: URL): Response {
+export async function macroSummary(url: URL): Promise<Response> {
 	const from = url.searchParams.get("from");
 	const to = url.searchParams.get("to");
 
-	let macros = store.macros;
+	let macros = await listMacroEntries();
 	if (from && to) {
 		macros = macros.filter((m) => m.date >= from && m.date <= to);
 	}

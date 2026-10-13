@@ -1,13 +1,19 @@
-import { store, save } from "../db/store.ts";
+import {
+	deleteJournalEntryByDate,
+	getJournalEntryByDate,
+	listJournalEntriesAll,
+	putJournalEntry,
+} from "../db/store.ts";
+import type { JournalEntry } from "../db/store.ts";
 import { jsonResponse, errorResponse } from "../utils/http.ts";
 
-export function listJournalEntries(): Response {
-	const entries = Object.values(store.journal).sort((a, b) => b.date.localeCompare(a.date));
+export async function listJournalEntries(): Promise<Response> {
+	const entries = (await listJournalEntriesAll()).sort((a, b) => b.date.localeCompare(a.date));
 	return jsonResponse(entries);
 }
 
-export function getJournalEntry(date: string): Response {
-	return jsonResponse(store.journal[date] ?? null);
+export async function getJournalEntry(date: string): Promise<Response> {
+	return jsonResponse(await getJournalEntryByDate(date));
 }
 
 export async function upsertJournalEntry(req: Request): Promise<Response> {
@@ -17,9 +23,9 @@ export async function upsertJournalEntry(req: Request): Promise<Response> {
 	}
 
 	const now = new Date().toISOString();
-	const existing = store.journal[body.date];
+	const existing = await getJournalEntryByDate(body.date);
 
-	store.journal[body.date] = {
+	const entry: JournalEntry = {
 		date: body.date,
 		mood: body.mood ?? null,
 		energy: body.energy ?? null,
@@ -28,12 +34,11 @@ export async function upsertJournalEntry(req: Request): Promise<Response> {
 		updated_at: now,
 	};
 
-	await save();
-	return jsonResponse(store.journal[body.date]);
+	await putJournalEntry(entry);
+	return jsonResponse(entry);
 }
 
 export async function deleteJournalEntry(date: string): Promise<Response> {
-	delete store.journal[date];
-	await save();
+	await deleteJournalEntryByDate(date);
 	return jsonResponse({ ok: true });
 }

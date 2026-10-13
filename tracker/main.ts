@@ -1,3 +1,4 @@
+import { finishOuraLogin, startOuraLogin } from "./oura.ts";
 import { getDashboard } from "./routes/dashboard.ts";
 import {
 	deleteJournalEntry,
@@ -18,8 +19,10 @@ import {
 	getWorkout,
 	listExerciseNames,
 	listWorkouts,
+	progression,
 	updateWorkout,
 } from "./routes/workouts.ts";
+import { checkPassword } from "./utils/auth.ts";
 import { errorResponse } from "./utils/http.ts";
 import { serveStatic } from "./utils/static.ts";
 
@@ -28,7 +31,18 @@ async function handler(req: Request): Promise<Response> {
 	const { pathname } = url;
 	const { method } = req;
 
+	const denied = checkPassword(req);
+	if (denied) return denied;
+
 	try {
+		// oura sign-in
+		if (pathname === "/auth/oura/login" && method === "GET") {
+			return await startOuraLogin();
+		}
+		if (pathname === "/auth/oura/callback" && method === "GET") {
+			return await finishOuraLogin(url);
+		}
+
 		// dashboard
 		if (pathname === "/api/dashboard" && method === "GET") {
 			return await getDashboard(url);
@@ -36,14 +50,14 @@ async function handler(req: Request): Promise<Response> {
 
 		// journal
 		if (pathname === "/api/journal" && method === "GET") {
-			return listJournalEntries();
+			return await listJournalEntries();
 		}
 		if (pathname === "/api/journal" && method === "PUT") {
 			return await upsertJournalEntry(req);
 		}
 		const journalMatch = pathname.match(/^\/api\/journal\/([^/]+)$/);
 		if (journalMatch && method === "GET") {
-			return getJournalEntry(decodeURIComponent(journalMatch[1]));
+			return await getJournalEntry(decodeURIComponent(journalMatch[1]));
 		}
 		if (journalMatch && method === "DELETE") {
 			return await deleteJournalEntry(decodeURIComponent(journalMatch[1]));
@@ -51,14 +65,14 @@ async function handler(req: Request): Promise<Response> {
 
 		// workouts
 		if (pathname === "/api/workouts" && method === "GET") {
-			return listWorkouts(url);
+			return await listWorkouts(url);
 		}
 		if (pathname === "/api/workouts" && method === "POST") {
 			return await createWorkout(req);
 		}
 		const workoutMatch = pathname.match(/^\/api\/workouts\/(\d+)$/);
 		if (workoutMatch && method === "GET") {
-			return getWorkout(Number(workoutMatch[1]));
+			return await getWorkout(Number(workoutMatch[1]));
 		}
 		if (workoutMatch && method === "PUT") {
 			return await updateWorkout(Number(workoutMatch[1]), req);
@@ -69,22 +83,27 @@ async function handler(req: Request): Promise<Response> {
 
 		// exercises
 		if (pathname === "/api/exercises" && method === "GET") {
-			return listExerciseNames();
+			return await listExerciseNames();
 		}
 		const exerciseMatch = pathname.match(/^\/api\/exercises\/([^/]+)\/history$/);
 		if (exerciseMatch && method === "GET") {
-			return exerciseHistory(decodeURIComponent(exerciseMatch[1]));
+			return await exerciseHistory(decodeURIComponent(exerciseMatch[1]));
+		}
+
+		// progression targets for the Program tab
+		if (pathname === "/api/progression" && method === "GET") {
+			return await progression(url);
 		}
 
 		// macros
 		if (pathname === "/api/macros" && method === "GET") {
-			return listMacros(url);
+			return await listMacros(url);
 		}
 		if (pathname === "/api/macros" && method === "POST") {
 			return await createMacro(req);
 		}
 		if (pathname === "/api/macros/summary" && method === "GET") {
-			return macroSummary(url);
+			return await macroSummary(url);
 		}
 		const macroMatch = pathname.match(/^\/api\/macros\/(\d+)$/);
 		if (macroMatch && method === "DELETE") {

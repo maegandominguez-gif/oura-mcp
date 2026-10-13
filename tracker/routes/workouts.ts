@@ -1,10 +1,17 @@
-import { save, store } from "../db/store.ts";
+import {
+	deleteWorkoutEntry,
+	getWorkoutEntry,
+	insertWorkoutEntry,
+	listWorkoutEntries,
+	putWorkoutEntry,
+} from "../db/store.ts";
 import type { ExerciseEntry, WorkoutEntry } from "../db/store.ts";
+import { getReadinessScore } from "../oura.ts";
 import { jsonResponse, errorResponse } from "../utils/http.ts";
 
 type SetInput = { reps?: number; weight?: number; unit?: string; rpe?: number };
 type ExerciseInput = { name: string; sets?: SetInput[] };
-type WorkoutInput = { date: string; name: string; notes?: string; exercises?: ExerciseInput[] };
+type WorkoutInput = { date: string; name: string; notes?: string; readiness?: number | null; exercises?: ExerciseInput[] };
 
 function normalizeExercises(exercises: ExerciseInput[] | undefined): ExerciseEntry[] {
 	return (exercises ?? []).map((exercise) => ({
@@ -18,21 +25,29 @@ function normalizeExercises(exercises: ExerciseInput[] | undefined): ExerciseEnt
 	}));
 }
 
-export function listWorkouts(url: URL): Response {
+/** Matches an exercise across days: "S2C · DB Hammer Curl" and "db hammer curl" are the same lift. */
+function exerciseKey(name: string): string {
+	return name.replace(/^[A-Z]\d[A-Z]?\s*·\s*/, "").trim().toLowerCase();
+}
+
+function newestFirst(a: WorkoutEntry, b: WorkoutEntry): number {
+	return b.date.localeCompare(a.date) || b.id - a.id;
+}
+
+export async function listWorkouts(url: URL): Promise<Response> {
 	const from = url.searchParams.get("from");
 	const to = url.searchParams.get("to");
 
-	let workouts = store.workouts;
+	let workouts = await listWorkoutEntries();
 	if (from && to) {
 		workouts = workouts.filter((w) => w.date >= from && w.date <= to);
 	}
 
-	const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
-	return jsonResponse(sorted);
+	return jsonResponse(workouts.sort(newestFirst));
 }
 
-export function getWorkout(id: number): Response {
-	const workout = store.workouts.find((w) => w.id === id);
+export async function getWorkout(id: number): Promise<Response> {
+	const workout = await getWorkoutEntry(id);
 	if (!workout) return errorResponse("workout not found", 404);
 	return jsonResponse(workout);
 }
@@ -43,22 +58,20 @@ export async function createWorkout(req: Request): Promise<Response> {
 		return errorResponse("date and name are required", 400);
 	}
 
-	const workout: WorkoutEntry = {
-		id: store.nextWorkoutId++,
+	const workout = await insertWorkoutEntry({
 		date: body.date,
 		name: body.name,
 		notes: body.notes ?? null,
-		created_at: new Date().toISOString(),
+		// look the score up when the client didn't send one, so manual logs get it too
+		readiness: body.readiness ?? await getReadinessScore(body.date),
 		exercises: normalizeExercises(body.exercises),
-	};
+	});
 
-	store.workouts.push(workout);
-	await save();
 	return jsonResponse(workout, 201);
 }
 
 export async function updateWorkout(id: number, req: Request): Promise<Response> {
-	const workout = store.workouts.find((w) => w.id === id);
+	const workout = await getWorkoutEntry(id);
 	if (!workout) return errorResponse("workout not found", 404);
 
 	const body = await req.json().catch(() => null) as WorkoutInput | null;
@@ -69,27 +82,26 @@ export async function updateWorkout(id: number, req: Request): Promise<Response>
 	workout.date = body.date;
 	workout.name = body.name;
 	workout.notes = body.notes ?? null;
+	workout.readiness = body.readiness ?? workout.readiness ?? null;
 	workout.exercises = normalizeExercises(body.exercises);
 
-	await save();
+	await putWorkoutEntry(workout);
 	return jsonResponse(workout);
 }
 
 export async function deleteWorkout(id: number): Promise<Response> {
-	const index = store.workouts.findIndex((w) => w.id === id);
-	if (index === -1) return errorResponse("workout not found", 404);
+	if (!await getWorkoutEntry(id)) return errorResponse("workout not found", 404);
 
-	store.workouts.splice(index, 1);
-	await save();
+	await deleteWorkoutEntry(id);
 	return jsonResponse({ ok: true });
 }
 
-export function exerciseHistory(name: string): Response {
+export async function exerciseHistory(name: string): Promise<Response> {
 	const rows: { date: string; workout_id: number; reps: number | null; weight: number | null; unit: string; rpe: number | null }[] = [];
 
-	for (const workout of store.workouts) {
+	for (const workout of await listWorkoutEntries()) {
 		for (const exercise of workout.exercises) {
-			if (exercise.name.toLowerCase() !== name.toLowerCase()) continue;
+			if (exerciseKey(exercise.name) !== exerciseKey(name)) continue;
 			for (const set of exercise.sets) {
 				rows.push({
 					date: workout.date,
@@ -107,12 +119,89 @@ export function exerciseHistory(name: string): Response {
 	return jsonResponse(rows);
 }
 
-export function listExerciseNames(): Response {
+export async function listExerciseNames(): Promise<Response> {
 	const names = new Set<string>();
-	for (const workout of store.workouts) {
+	for (const workout of await listWorkoutEntries()) {
 		for (const exercise of workout.exercises) {
 			names.add(exercise.name);
 		}
 	}
 	return jsonResponse([...names].sort((a, b) => a.localeCompare(b)));
+}
+
+type ProgressionTarget = {
+	last: { date: string; weight: number; unit: string; reps: number | null; maxRpe: number | null } | null;
+	target: number | null;
+	unit: string;
+	reason: string;
+};
+
+// Readiness gating from the program: 85+ allows added load, below that hold.
+const GREEN_READINESS = 85;
+
+/**
+ * GET /api/progression?date=YYYY-MM-DD&name=...&name=...
+ * For each exercise, the last session before `date` and that day's target weight:
+ * +5 lb (or +2.5 kg) when every weighted set was logged at RPE 7 or below,
+ * otherwise repeat the weight. No added load when readiness is under 85.
+ */
+export async function progression(url: URL): Promise<Response> {
+	const date = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
+	const names = url.searchParams.getAll("name");
+
+	const [workouts, readiness] = await Promise.all([
+		listWorkoutEntries(),
+		getReadinessScore(date),
+	]);
+	const previous = workouts.filter((w) => w.date < date).sort(newestFirst);
+
+	const targets: Record<string, ProgressionTarget> = {};
+
+	for (const name of names) {
+		const key = exerciseKey(name);
+		let lastSets: ExerciseEntry["sets"] = [];
+		let lastDate = "";
+
+		for (const workout of previous) {
+			const match = workout.exercises.find((e) => exerciseKey(e.name) === key && e.sets.some((s) => s.weight != null));
+			if (match) {
+				lastSets = match.sets.filter((s) => s.weight != null);
+				lastDate = workout.date;
+				break;
+			}
+		}
+
+		if (!lastSets.length) {
+			targets[name] = { last: null, target: null, unit: "lb", reason: "No weighted sets logged yet" };
+			continue;
+		}
+
+		const top = lastSets.reduce((best, s) => (s.weight! > best.weight! ? s : best));
+		const rpes = lastSets.map((s) => s.rpe);
+		const allRpeLogged = rpes.every((r) => r != null);
+		const maxRpe = allRpeLogged ? Math.max(...(rpes as number[])) : null;
+		const increment = top.unit === "kg" ? 2.5 : 5;
+
+		let target = top.weight!;
+		let reason: string;
+		if (!allRpeLogged) {
+			reason = "RPE not logged on every set, so repeat";
+		} else if (maxRpe! > 7) {
+			reason = `Top RPE ${maxRpe}, so repeat`;
+		} else if (readiness != null && readiness < GREEN_READINESS) {
+			reason = `RPE ≤7, but readiness ${readiness} means no added load`;
+		} else {
+			target += increment;
+			reason = "RPE ≤7 on all sets";
+		}
+
+		targets[name] = {
+			last: { date: lastDate, weight: top.weight!, unit: top.unit, reps: top.reps, maxRpe },
+			target,
+			unit: top.unit,
+			reason,
+		};
+	}
+
+	return jsonResponse({ date, readiness, targets });
 }
