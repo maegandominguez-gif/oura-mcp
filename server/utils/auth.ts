@@ -11,8 +11,8 @@ export type OuraTokenResponse = {
 function getOAuthConfig() {
 	const clientId = Deno.env.get('CLIENT_ID');
 	const clientSecret = Deno.env.get('CLIENT_SECRET');
-	const port = Deno.env.get('PORT') || '3000';
-	const redirectUrl = Deno.env.get('REDIRECT_URL') || `http://localhost:${port}/auth/callback`;
+	const authPort = Deno.env.get('AUTH_PORT') || Deno.env.get('PORT') || '3001';
+	const redirectUrl = Deno.env.get('REDIRECT_URL') || `http://localhost:${authPort}/auth/callback`;
 
 	if (!clientId || !clientSecret) {
 		throw new Error('Missing CLIENT_ID or CLIENT_SECRET; check environment variables');
