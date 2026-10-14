@@ -47,9 +47,13 @@ export async function getReadinessScore(date: string): Promise<number | null> {
 	const client = await getOuraClient();
 	if (!client) return null;
 	try {
-		const day = new Date(`${date}T00:00:00.000Z`);
-		const readiness = await client.getDailyReadiness(day, day);
-		return readiness.data[0]?.score ?? null;
+		// query the surrounding days and match on `day`; see routes/dashboard.ts
+		const from = new Date(`${date}T00:00:00.000Z`);
+		from.setUTCDate(from.getUTCDate() - 1);
+		const to = new Date(`${date}T00:00:00.000Z`);
+		to.setUTCDate(to.getUTCDate() + 1);
+		const readiness = await client.getDailyReadiness(from, to);
+		return readiness.data.find((d) => d.day === date)?.score ?? null;
 	} catch {
 		return null;
 	}

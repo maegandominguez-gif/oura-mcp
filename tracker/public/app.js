@@ -169,6 +169,63 @@ function setDate(iso) {
 }
 
 // ---------- dashboard ----------
+function formatDuration(seconds) {
+	if (seconds == null) return null;
+	const h = Math.floor(seconds / 3600);
+	const m = Math.round((seconds % 3600) / 60);
+	return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+function ouraStat(value, label) {
+	return `<div class="stat"><div class="value">${value ?? "–"}</div><div class="label">${label}</div></div>`;
+}
+
+function renderOuraCard(oura) {
+	const { readiness, sleep, activity, stress, spo2, sleepPeriod: night } = oura;
+	const num = (n) => (n == null ? null : Math.round(n).toLocaleString());
+	// Oura reports temperature deviation in °C; show it in °F with a sign
+	const temp = readiness?.temperature_deviation;
+	const tempF = temp == null ? null : `${temp >= 0 ? "+" : "−"}${Math.abs(temp * 1.8).toFixed(1)}°F`;
+	const miles = activity?.equivalent_walking_distance == null ? null : (activity.equivalent_walking_distance / 1609.34).toFixed(1);
+	const stressSummary = stress?.day_summary ? stress.day_summary[0].toUpperCase() + stress.day_summary.slice(1) : null;
+
+	const group = (title, stats) => `
+		<div class="oura-group">
+			<div class="oura-group-title">${title}</div>
+			<div class="grid">${stats.join("")}</div>
+		</div>`;
+
+	return `
+		<div class="card">
+			<h2>Oura</h2>
+			${group("Recovery", [
+				ouraStat(readiness?.score, "Readiness"),
+				ouraStat(num(night?.average_hrv), "HRV (ms)"),
+				ouraStat(num(night?.lowest_heart_rate), "Resting HR"),
+				ouraStat(tempF, "Temp vs baseline"),
+			])}
+			${group("Sleep", [
+				ouraStat(sleep?.score, "Sleep score"),
+				ouraStat(formatDuration(night?.total_sleep_duration), "Total sleep"),
+				ouraStat(night?.efficiency != null ? `${night.efficiency}%` : null, "Efficiency"),
+				ouraStat(formatDuration(night?.deep_sleep_duration), "Deep"),
+				ouraStat(formatDuration(night?.rem_sleep_duration), "REM"),
+			])}
+			${group("Activity", [
+				ouraStat(num(activity?.steps), "Steps"),
+				ouraStat(num(activity?.active_calories), "Active cal"),
+				ouraStat(num(activity?.total_calories), "Total cal"),
+				ouraStat(miles, "Walking (mi)"),
+			])}
+			${group("Stress & SpO₂", [
+				ouraStat(stressSummary, "Day summary"),
+				ouraStat(formatDuration(stress?.stress_high), "High stress"),
+				ouraStat(formatDuration(stress?.recovery_high), "Recovery"),
+				ouraStat(spo2?.spo2_percentage?.average != null ? `${spo2.spo2_percentage.average.toFixed(1)}%` : null, "SpO₂"),
+			])}
+		</div>`;
+}
+
 async function renderDashboard() {
 	const container = document.getElementById("view-dashboard");
 	container.innerHTML = `<div class="muted">Loading…</div>`;
@@ -187,20 +244,7 @@ async function renderDashboard() {
 		} else if (oura.error) {
 			ouraCard = `<div class="card"><h2>Oura</h2><div class="empty-state">${escapeHtml(oura.error)}</div></div>`;
 		} else {
-			const readiness = oura.readiness?.score ?? "–";
-			const sleep = oura.sleep?.score ?? "–";
-			const steps = oura.activity?.steps ?? "–";
-			const cals = oura.activity?.total_calories ?? "–";
-			ouraCard = `
-				<div class="card">
-					<h2>Oura</h2>
-					<div class="grid">
-						<div class="stat"><div class="value">${readiness}</div><div class="label">Readiness</div></div>
-						<div class="stat"><div class="value">${sleep}</div><div class="label">Sleep Score</div></div>
-						<div class="stat"><div class="value">${steps}</div><div class="label">Steps</div></div>
-						<div class="stat"><div class="value">${cals}</div><div class="label">Calories Burned</div></div>
-					</div>
-				</div>`;
+			ouraCard = renderOuraCard(oura);
 		}
 
 		const journal = data.journal;
