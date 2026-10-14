@@ -99,18 +99,14 @@ export type DailyStressResponse = {
 export type Workout = {
 	id: string;
 	day: string;
+	activity: string; // camelCase type, e.g. "walking", "strengthTraining", "hiit"
 	start_datetime: string;
 	end_datetime: string;
-	sport: string;
-	source: string;
-	calories: number;
-	distance: number | null;
-	duration: number;
-	intensity: string;
+	source: string; // "manual" | "autodetected" | "confirmed" | "workout_heart_rate"
+	calories: number | null;
+	distance: number | null; // meters
+	intensity: string; // "easy" | "moderate" | "hard"
 	label: string | null;
-	source_name: string;
-	strain: number | null;
-	timestamp: string;
 };
 
 export type WorkoutResponse = {
