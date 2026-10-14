@@ -130,11 +130,22 @@ function setTab(tab) {
 	state.tab = tab;
 	document.querySelectorAll("nav.tabs button").forEach((btn) => {
 		btn.classList.toggle("active", btn.dataset.tab === tab);
+		if (btn.dataset.tab === tab) scrollTabIntoView(btn);
 	});
 	document.querySelectorAll(".view").forEach((view) => {
 		view.classList.toggle("active", view.id === `view-${tab}`);
 	});
 	refreshActiveTab();
+}
+
+// Scrolls only the tab bar (not the page) so a partly hidden active tab is fully visible.
+function scrollTabIntoView(btn) {
+	const bar = btn.parentElement;
+	const left = btn.offsetLeft - bar.offsetLeft;
+	const right = left + btn.offsetWidth;
+	const edge = 32; // clear the right-edge fade
+	if (left < bar.scrollLeft) bar.scrollTo({ left: left - edge, behavior: "smooth" });
+	else if (right > bar.scrollLeft + bar.clientWidth - edge) bar.scrollTo({ left: right - bar.clientWidth + edge, behavior: "smooth" });
 }
 
 function refreshActiveTab() {
@@ -171,7 +182,7 @@ async function renderDashboard() {
 			ouraCard = `
 				<div class="card">
 					<h2>Oura</h2>
-					<div class="empty-state">Not connected. Set <code>OURA_API_KEY</code> in <code>tracker/.env</code> to see ring data here.</div>
+					<div class="empty-state">Not connected. <a href="/auth/oura/login">Connect Oura</a> to see ring data here.</div>
 				</div>`;
 		} else if (oura.error) {
 			ouraCard = `<div class="card"><h2>Oura</h2><div class="empty-state">${escapeHtml(oura.error)}</div></div>`;
@@ -936,6 +947,13 @@ document.addEventListener("DOMContentLoaded", () => {
 	document.querySelectorAll("nav.tabs button").forEach((btn) => {
 		btn.addEventListener("click", () => setTab(btn.dataset.tab));
 	});
+
+	// drop the right-edge fade once the tabs are scrolled all the way (or all fit)
+	const tabs = document.querySelector("nav.tabs");
+	const updateTabFade = () => tabs.classList.toggle("scrolled-end", tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 1);
+	tabs.addEventListener("scroll", updateTabFade, { passive: true });
+	window.addEventListener("resize", updateTabFade);
+	updateTabFade();
 
 	document.getElementById("prev-day").addEventListener("click", () => setDate(shiftDate(state.date, -1)));
 	document.getElementById("next-day").addEventListener("click", () => setDate(shiftDate(state.date, 1)));
