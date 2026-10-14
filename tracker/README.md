@@ -49,8 +49,11 @@ repo root, which is how Deno Deploy starts the app.
   (if connected) with what you've logged: journal mood/notes, workouts, and
   macro totals for that date.
 - **Program** — the 3-day garage program. Each exercise shows your last top
-  set and today's target: +5 lb when every set last time was RPE 7 or below,
-  otherwise repeat the weight, and no added load when readiness is under 85.
+  set and today's target: the next load up when every set last time was RPE 7
+  or below (+5 lb on a barbell, the next size for kettlebells, dumbbells and
+  the sandbag; add reps once on the heaviest), otherwise repeat the weight,
+  and no added load when readiness is under 85. Implement sizes are listed in
+  `FIXED_WEIGHTS` in `routes/workouts.ts`.
   **Start this workout** loads the day into Workouts with those targets filled in.
 - **Journal** — a daily mood + energy + free-text note, with a history list.
 - **Workouts** — log a session as a set of exercises, each with sets of

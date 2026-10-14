@@ -139,11 +139,27 @@ type ProgressionTarget = {
 // Readiness gating from the program: 85+ allows added load, below that hold.
 const GREEN_READINESS = 85;
 
+// Fixed-weight implements in the garage, in lb. Barbells are plate-loaded and
+// go up 5 lb at a time; these can only move to the next size that exists.
+const FIXED_WEIGHTS: { kind: string; pattern: RegExp; sizes: number[] }[] = [
+	{ kind: "sandbag", pattern: /\bsandbag\b/i, sizes: [25] },
+	{ kind: "kettlebell", pattern: /\b(kb|kettlebell)\b/i, sizes: [25, 35, 53] },
+	{ kind: "dumbbell", pattern: /\b(db|dumbbell)s?\b/i, sizes: [8, 10, 12, 15, 20] },
+];
+
+/** The next load up for an exercise, or null when already on the heaviest implement. */
+function nextLoad(name: string, weight: number, unit: string): { weight: number | null; kind: string | null } {
+	const implement = unit === "lb" ? FIXED_WEIGHTS.find((f) => f.pattern.test(name)) : undefined;
+	if (!implement) return { weight: weight + (unit === "kg" ? 2.5 : 5), kind: null };
+	return { weight: implement.sizes.find((size) => size > weight) ?? null, kind: implement.kind };
+}
+
 /**
  * GET /api/progression?date=YYYY-MM-DD&name=...&name=...
  * For each exercise, the last session before `date` and that day's target weight:
- * +5 lb (or +2.5 kg) when every weighted set was logged at RPE 7 or below,
- * otherwise repeat the weight. No added load when readiness is under 85.
+ * the next load up (+5 lb on a barbell, the next kettlebell/dumbbell size) when
+ * every weighted set was logged at RPE 7 or below, otherwise repeat the weight.
+ * No added load when readiness is under 85.
  */
 export async function progression(url: URL): Promise<Response> {
 	const date = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
@@ -180,7 +196,7 @@ export async function progression(url: URL): Promise<Response> {
 		const rpes = lastSets.map((s) => s.rpe);
 		const allRpeLogged = rpes.every((r) => r != null);
 		const maxRpe = allRpeLogged ? Math.max(...(rpes as number[])) : null;
-		const increment = top.unit === "kg" ? 2.5 : 5;
+		const next = nextLoad(name, top.weight!, top.unit);
 
 		let target = top.weight!;
 		let reason: string;
@@ -190,8 +206,10 @@ export async function progression(url: URL): Promise<Response> {
 			reason = `Top RPE ${maxRpe}, so repeat`;
 		} else if (readiness != null && readiness < GREEN_READINESS) {
 			reason = `RPE ≤7, but readiness ${readiness} means no added load`;
+		} else if (next.weight == null) {
+			reason = `RPE ≤7, already on the heaviest ${next.kind}, so add reps`;
 		} else {
-			target += increment;
+			target = next.weight;
 			reason = "RPE ≤7 on all sets";
 		}
 
