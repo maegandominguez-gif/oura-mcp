@@ -176,6 +176,18 @@ main {
 	font-weight: 700;
 }
 
+.oura-group + .oura-group { margin-top: 1rem; }
+.oura-group .grid { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 0.5rem; }
+.oura-group .stat .value { font-size: 1.2rem; }
+
+.oura-group-title {
+	font-size: 0.72rem;
+	color: var(--text-dim);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	margin-bottom: 0.4rem;
+}
+
 .stat .label {
 	font-size: 0.75rem;
 	color: var(--text-dim);

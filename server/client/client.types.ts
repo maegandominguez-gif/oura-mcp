@@ -12,6 +12,7 @@ export type DailyReadiness = {
 	contributors: Record<string, unknown>;
 	day: string;
 	score: number | null;
+	temperature_deviation?: number | null;
 	timestamp: string;
 };
 
@@ -86,6 +87,7 @@ export type DailyStress = {
 	recovery_high: number;
 	recovery_average: number;
 	recovery_low: number;
+	day_summary?: "restored" | "normal" | "stressful" | null;
 	timestamp: string;
 };
 
@@ -120,11 +122,36 @@ export type DailySPO2 = {
 	id: string;
 	day: string;
 	contributors: Record<string, unknown>;
-	spo2_percentage: number | null;
+	spo2_percentage: { average: number } | null;
+	breathing_disturbance_index?: number | null;
 	timestamp: string;
 };
 
 export type DailySPO2Response = {
 	data: DailySPO2[];
 	nextToken: string | null;
+};
+/** One sleep period from /usercollection/sleep. Durations are in seconds. */
+export type SleepPeriod = {
+	id: string;
+	day: string;
+	type: "long_sleep" | "sleep" | "late_nap" | "rest" | "deleted" | string;
+	bedtime_start: string;
+	bedtime_end: string;
+	total_sleep_duration: number | null;
+	time_in_bed: number;
+	efficiency: number | null;
+	latency: number | null;
+	deep_sleep_duration: number | null;
+	rem_sleep_duration: number | null;
+	light_sleep_duration: number | null;
+	average_hrv: number | null;
+	average_heart_rate: number | null;
+	lowest_heart_rate: number | null;
+	average_breath: number | null;
+};
+
+export type SleepPeriodResponse = {
+	data: SleepPeriod[];
+	next_token: string | null;
 };

@@ -1,7 +1,7 @@
 // oura client
 
 import { throwOuraError } from "./client.errors.ts";
-import { DailyActivityResponse, DailyReadinessResponse, DailySleepResponse, HeartRateResponse, DailyStressResponse, WorkoutResponse, DailySPO2Response, PersonalInfo } from "./client.types.ts";
+import { DailyActivityResponse, DailyReadinessResponse, DailySleepResponse, HeartRateResponse, DailyStressResponse, WorkoutResponse, DailySPO2Response, PersonalInfo, SleepPeriodResponse } from "./client.types.ts";
 
 const OURA_BASE_URL = "https://api.ouraring.com/v2";
 
@@ -240,5 +240,32 @@ export class OuraApi {
 		const dailySPO2 = await this._request<DailySPO2Response>("/usercollection/daily_spo2", {}, filters);
 
 		return dailySPO2;
+	}
+
+	/**
+	 * Get detailed sleep periods from Oura (HRV, heart rate, stage durations)
+	 *
+	 * @param {Date} startDate the start of the period you would like data for
+	 * @param {Date} endDate the end of the period you would like data for
+	 * @returns {Promise<SleepPeriodResponse>}
+	 */
+	async getSleepPeriods(
+		startDate?: Date,
+		endDate?: Date,
+	): Promise<SleepPeriodResponse> {
+		if (!startDate) {
+			startDate = new Date(new Date().setDate(new Date().getDate() - 1));
+		}
+		if (!endDate) {
+			endDate = new Date();
+		}
+
+		const filters = new URLSearchParams();
+		filters.append("start_date", formatDateForOuraAPI(startDate));
+		filters.append("end_date", formatDateForOuraAPI(endDate));
+
+		const sleepPeriods = await this._request<SleepPeriodResponse>("/usercollection/sleep", {}, filters);
+
+		return sleepPeriods;
 	}
 }
