@@ -110,7 +110,17 @@ nav.tabs.scrolled-end { mask-image: none; }
 	.date-nav input[type="date"] { flex: 1; min-width: 0; }
 	nav.tabs { padding: 0.25rem 1rem 0; }
 	nav.tabs button { padding: 0.5rem 0.75rem; }
+
+	/* set rows: five fields in ~280px, so tighten padding and give weight the most room */
+	.set-row { grid-template-columns: 1.4rem 1fr 1.25fr 3.4rem 1fr 1.6rem; gap: 0.3rem; }
+	.set-row input, .set-row select { padding: 0.45rem 0.4rem; font-size: 0.88rem; }
+	.set-row .icon-btn { padding: 0.2rem; }
 }
+
+/* spin arrows eat most of a narrow number field and aren't useful for logging sets */
+.set-row input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.set-row input[type="number"]::-webkit-inner-spin-button,
+.set-row input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
 nav.tabs button {
 	background: transparent;

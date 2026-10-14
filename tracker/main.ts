@@ -1,4 +1,5 @@
 import { finishOuraLogin, startOuraLogin } from "./oura.ts";
+import { listOuraWorkouts } from "./routes/cardio.ts";
 import { getDashboard } from "./routes/dashboard.ts";
 import {
 	deleteJournalEntry,
@@ -26,7 +27,7 @@ import { checkPassword } from "./utils/auth.ts";
 import { errorResponse } from "./utils/http.ts";
 import { serveStatic } from "./utils/static.ts";
 
-async function handler(req: Request): Promise<Response> {
+export async function handler(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const { pathname } = url;
 	const { method } = req;
@@ -93,6 +94,11 @@ async function handler(req: Request): Promise<Response> {
 		// progression targets for the Program tab
 		if (pathname === "/api/progression" && method === "GET") {
 			return await progression(url);
+		}
+
+		// cardio recorded by Oura, for the Workouts tab
+		if (pathname === "/api/oura/workouts" && method === "GET") {
+			return await listOuraWorkouts(url);
 		}
 
 		// macros

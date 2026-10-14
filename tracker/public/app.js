@@ -67,14 +67,14 @@ function drawLineChart(canvas, points, opts = {}) {
 	const h = rect.height - padding.top - padding.bottom;
 
 	const ys = points.map((p) => p.y);
-	let minY = Math.min(...ys);
+	let minY = opts.minY ?? Math.min(...ys);
 	let maxY = Math.max(...ys);
 	if (minY === maxY) {
 		minY -= 1;
 		maxY += 1;
 	}
 	const yPad = (maxY - minY) * 0.1;
-	minY -= yPad;
+	if (opts.minY == null) minY -= yPad;
 	maxY += yPad;
 
 	const xFor = (i) => padding.left + (points.length === 1 ? w / 2 : (i / (points.length - 1)) * w);
@@ -93,7 +93,7 @@ function drawLineChart(canvas, points, opts = {}) {
 		ctx.lineTo(padding.left + w, y);
 		ctx.stroke();
 		const value = maxY - ((maxY - minY) / steps) * i;
-		ctx.fillText(value.toFixed(value < 10 ? 1 : 0), 4, y + 3);
+		ctx.fillText(value.toFixed(value !== 0 && Math.abs(value) < 10 ? 1 : 0), 4, y + 3);
 	}
 
 	// line
@@ -121,7 +121,9 @@ function drawLineChart(canvas, points, opts = {}) {
 	const labelIdxs = new Set([0, points.length - 1, Math.floor((points.length - 1) / 2)]);
 	labelIdxs.forEach((i) => {
 		if (i < 0 || i >= points.length) return;
-		ctx.fillText(points[i].x, xFor(i) - 14, rect.height - 6);
+		// anchor the first and last labels to the plot edges so they aren't clipped
+		ctx.textAlign = i === 0 ? "left" : i === points.length - 1 ? "right" : "center";
+		ctx.fillText(points[i].x, i === points.length - 1 ? Math.min(xFor(i) + 4, rect.width - 2) : xFor(i) - (i === 0 ? 4 : 0), rect.height - 6);
 	});
 }
 
@@ -178,6 +180,33 @@ function formatDuration(seconds) {
 
 function ouraStat(value, label) {
 	return `<div class="stat"><div class="value">${value ?? "–"}</div><div class="label">${label}</div></div>`;
+}
+
+// "strengthTraining" -> "Strength training"
+function humanizeActivity(activity) {
+	if (activity === "hiit") return "HIIT";
+	const words = activity.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+	return words[0].toUpperCase() + words.slice(1);
+}
+
+function renderOuraWorkoutHtml(w, withDate = false) {
+	const start = new Date(w.start_datetime);
+	const minutes = workoutMinutes(w);
+	const time = (withDate ? `${formatDateLabel(w.day)}, ` : "") + start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+	const details = [
+		`${minutes} min`,
+		w.calories != null ? `${Math.round(w.calories)} cal` : null,
+		w.distance >= 400 ? `${(w.distance / 1609.34).toFixed(1)} mi` : null, // skip incidental distance on classes
+		w.intensity,
+	].filter(Boolean).join(" · ");
+	return `
+		<div class="list-item">
+			<div class="list-item-header">
+				<span class="title">${escapeHtml(w.label || humanizeActivity(w.activity))}</span>
+				<span class="muted">${time}</span>
+			</div>
+			<div class="muted">${escapeHtml(details)}${w.source === "autodetected" ? " · auto-detected" : ""}</div>
+		</div>`;
 }
 
 function renderOuraCard(oura) {
@@ -258,12 +287,16 @@ async function renderDashboard() {
 				<button class="secondary" style="margin-top:0.6rem" onclick="setTab('journal')">Open journal →</button>
 			</div>`;
 
+		const ouraWorkouts = (oura.workouts ?? []).filter((w) => w.activity !== "houseWork");
 		const workoutsCard = `
 			<div class="card">
 				<h2>Workouts</h2>
 				${data.workouts.length
 					? data.workouts.map((w) => `<div class="list-item"><div class="list-item-header"><span class="title">${escapeHtml(w.name)}</span><span class="muted">${w.exercises.length} exercise${w.exercises.length === 1 ? "" : "s"}</span></div></div>`).join("")
 					: `<div class="empty-state">No workout logged for this day.</div>`}
+				${ouraWorkouts.length
+					? `<div class="oura-group-title" style="margin-top:0.75rem;">From Oura</div>${ouraWorkouts.map(renderOuraWorkoutHtml).join("")}`
+					: ""}
 				<button class="secondary" style="margin-top:0.6rem" onclick="setTab('workouts')">Open workouts →</button>
 			</div>`;
 
@@ -419,6 +452,13 @@ async function renderWorkouts() {
 		</div>
 
 		<div class="card">
+			<h2>Cardio from Oura</h2>
+			<div class="muted" id="cardio-summary">Loading…</div>
+			<canvas class="chart" id="cardio-chart" style="margin-top:0.75rem;"></canvas>
+			<div id="cardio-list" style="margin-top:0.75rem;"></div>
+		</div>
+
+		<div class="card">
 			<h2>History</h2>
 			${workouts.length
 				? workouts.map(renderWorkoutListItem).join("")
@@ -488,7 +528,67 @@ async function renderWorkouts() {
 		state.selectedExercise = exerciseSelect.value || null;
 		await renderExerciseChart();
 	});
-	await renderExerciseChart();
+	await Promise.all([renderExerciseChart(), renderCardio()]);
+}
+
+const CARDIO_WEEKS = 8;
+const CARDIO_LIST_PREVIEW = 8;
+
+function workoutMinutes(w) {
+	return Math.round((new Date(w.end_datetime) - new Date(w.start_datetime)) / 60000);
+}
+
+// Monday of the week containing `iso`
+function weekStart(iso) {
+	const dow = (new Date(`${iso}T00:00:00`).getDay() + 6) % 7;
+	return shiftDate(iso, -dow);
+}
+
+// Weekly cardio minutes from Oura-recorded workouts, plus the recent sessions.
+async function renderCardio() {
+	const summary = document.getElementById("cardio-summary");
+	const canvas = document.getElementById("cardio-chart");
+	const list = document.getElementById("cardio-list");
+
+	const thisWeek = weekStart(state.date);
+	const from = shiftDate(thisWeek, -7 * (CARDIO_WEEKS - 1));
+	let data;
+	try {
+		data = await api(`/api/oura/workouts?from=${from}&to=${state.date}`);
+	} catch (err) {
+		summary.textContent = `Couldn't load Oura workouts: ${err.message}`;
+		canvas.style.display = "none";
+		return;
+	}
+	if (!data.connected) {
+		summary.innerHTML = `<a href="/auth/oura/login">Connect Oura</a> to see cardio here.`;
+		canvas.style.display = "none";
+		return;
+	}
+
+	const weeks = Array.from({ length: CARDIO_WEEKS }, (_, i) => shiftDate(from, 7 * i));
+	const minutesByWeek = new Map(weeks.map((w) => [w, 0]));
+	for (const w of data.workouts) {
+		const week = weekStart(w.day);
+		if (minutesByWeek.has(week)) minutesByWeek.set(week, minutesByWeek.get(week) + workoutMinutes(w));
+	}
+	const shortDate = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+	drawLineChart(canvas, weeks.map((w) => ({ x: shortDate(w), y: minutesByWeek.get(w) })), { color: "#7eb8f0", minY: 0 });
+
+	const current = data.workouts.filter((w) => w.day >= thisWeek);
+	summary.textContent = `This week: ${minutesByWeek.get(thisWeek)} min across ${current.length} session${current.length === 1 ? "" : "s"} · weekly minutes, last ${CARDIO_WEEKS} weeks`;
+
+	const renderList = (showAll) => {
+		const shown = showAll ? data.workouts : data.workouts.slice(0, CARDIO_LIST_PREVIEW);
+		list.innerHTML = shown.length
+			? shown.map((w) => renderOuraWorkoutHtml(w, true)).join("") +
+				(!showAll && data.workouts.length > shown.length
+					? `<button class="secondary" id="cardio-show-all" style="margin-top:0.5rem;">Show all ${data.workouts.length}</button>`
+					: "")
+			: `<div class="empty-state">No Oura workouts in the last ${CARDIO_WEEKS} weeks.</div>`;
+		list.querySelector("#cardio-show-all")?.addEventListener("click", () => renderList(true));
+	};
+	renderList(false);
 }
 
 function renderWorkoutListItem(w) {
