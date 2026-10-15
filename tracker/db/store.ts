@@ -13,6 +13,18 @@ export type ExerciseEntry = {
 	sets: SetEntry[];
 };
 
+/** Details kept on workouts imported from Oura (cardio, classes...). */
+export type OuraWorkoutInfo = {
+	id: string;
+	activity: string;
+	start: string;
+	minutes: number;
+	calories: number | null;
+	distance: number | null; // meters
+	intensity: string;
+	autodetected: boolean;
+};
+
 export type WorkoutEntry = {
 	id: number;
 	date: string;
@@ -21,6 +33,7 @@ export type WorkoutEntry = {
 	readiness: number | null;
 	created_at: string;
 	exercises: ExerciseEntry[];
+	oura?: OuraWorkoutInfo;
 };
 
 export type JournalEntry = {
@@ -85,6 +98,24 @@ export async function insertWorkoutEntry(data: Omit<WorkoutEntry, "id" | "create
 	};
 	await kv.set(["workouts", workout.id], workout);
 	return workout;
+}
+
+/**
+ * Inserts a workout imported from Oura unless that Oura workout was imported
+ * before. The marker outlives the workout, so deleting an import keeps it gone.
+ * Returns false when it was already imported.
+ */
+export async function insertOuraWorkoutEntry(data: Omit<WorkoutEntry, "id" | "created_at"> & { oura: OuraWorkoutInfo }): Promise<boolean> {
+	const marker = ["oura", "imported", data.oura.id];
+	if ((await kv.get(marker)).value) return false;
+
+	const workout: WorkoutEntry = { id: await nextId("workouts"), created_at: new Date().toISOString(), ...data };
+	const result = await kv.atomic()
+		.check({ key: marker, versionstamp: null }) // a concurrent sync may have just imported it
+		.set(marker, workout.id)
+		.set(["workouts", workout.id], workout)
+		.commit();
+	return result.ok;
 }
 
 export async function putWorkoutEntry(workout: WorkoutEntry): Promise<void> {

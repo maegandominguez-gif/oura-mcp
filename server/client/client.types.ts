@@ -111,7 +111,7 @@ export type Workout = {
 
 export type WorkoutResponse = {
 	data: Workout[];
-	nextToken: string | null;
+	next_token: string | null;
 };
 
 export type DailySPO2 = {

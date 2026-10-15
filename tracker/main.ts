@@ -1,5 +1,5 @@
 import { finishOuraLogin, startOuraLogin } from "./oura.ts";
-import { listOuraWorkouts } from "./routes/cardio.ts";
+import { listOuraWorkouts, syncOuraWorkouts } from "./routes/cardio.ts";
 import { getDashboard } from "./routes/dashboard.ts";
 import {
 	deleteJournalEntry,
@@ -99,6 +99,9 @@ export async function handler(req: Request): Promise<Response> {
 		// cardio recorded by Oura, for the Workouts tab
 		if (pathname === "/api/oura/workouts" && method === "GET") {
 			return await listOuraWorkouts(url);
+		}
+		if (pathname === "/api/oura/sync" && method === "POST") {
+			return await syncOuraWorkouts(url);
 		}
 
 		// macros
