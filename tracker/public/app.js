@@ -430,6 +430,8 @@ async function renderJournal() {
 }
 
 // ---------- workouts ----------
+const OURA_HISTORY_DAYS = 7;
+
 let workoutDraft = null;
 
 function newWorkoutDraft() {
@@ -447,6 +449,9 @@ async function renderWorkouts() {
 		api(`/api/exercises`),
 	]);
 	state.exerciseNames = exerciseNames;
+	// lifting sessions stay forever; synced Oura workouts only for the last week
+	const ouraCutoff = shiftDate(todayISO(), -(OURA_HISTORY_DAYS - 1));
+	const history = workouts.filter((w) => !w.oura || w.date >= ouraCutoff);
 
 	container.innerHTML = `
 		<div class="card">
@@ -479,15 +484,21 @@ async function renderWorkouts() {
 		</div>
 
 		<div class="card">
-			<h2>Cardio from Oura</h2>
+			<div class="card-header-row">
+				<h2>Oura workouts</h2>
+				<select id="cardio-category" aria-label="Workout category">
+					${Object.entries(CARDIO_CATEGORIES).map(([key, c]) => `<option value="${key}">${c.label}</option>`).join("")}
+				</select>
+			</div>
 			<div class="muted" id="cardio-summary">Loading…</div>
 			<canvas class="chart" id="cardio-chart" style="margin-top:0.75rem;"></canvas>
 		</div>
 
 		<div class="card">
 			<h2>History</h2>
-			${workouts.length
-				? workouts.map(renderWorkoutListItem).join("")
+			<div class="muted" style="margin-bottom:0.5rem;">Oura workouts from the last ${OURA_HISTORY_DAYS} days</div>
+			${history.length
+				? history.map(renderWorkoutListItem).join("")
 				: `<div class="empty-state">No workouts logged yet.</div>`}
 		</div>
 	`;
@@ -571,6 +582,37 @@ async function renderWorkouts() {
 
 const CARDIO_WEEKS = 8;
 
+// Oura activity types grouped for the cardio card's category dropdown.
+// Types not listed here (Oura has many) only count under "All".
+const CARDIO_CATEGORIES = {
+	conditioning: {
+		label: "Conditioning",
+		activities: ["hiit", "crossTraining", "dance", "running", "cycling", "rowing", "elliptical", "stairExercise", "swimming", "boxing", "kickboxing", "jumpRope", "spinning"],
+	},
+	walking: { label: "Walking & hiking", activities: ["walking", "hiking"] },
+	strength: { label: "Strength training", activities: ["strengthTraining", "weightLifting", "functionalTraining"] },
+	mobility: { label: "Yoga & pilates", activities: ["yoga", "pilates", "stretching"] },
+	all: { label: "All", activities: null },
+};
+const DEFAULT_CARDIO_CATEGORY = "conditioning";
+
+function loadCardioCategory() {
+	try {
+		const saved = localStorage.getItem("cardioCategory");
+		return saved in CARDIO_CATEGORIES ? saved : DEFAULT_CARDIO_CATEGORY;
+	} catch {
+		return DEFAULT_CARDIO_CATEGORY;
+	}
+}
+
+function saveCardioCategory(key) {
+	try {
+		localStorage.setItem("cardioCategory", key);
+	} catch {
+		// storage unavailable (private mode); the choice just won't persist
+	}
+}
+
 function workoutMinutes(w) {
 	return Math.round((new Date(w.end_datetime) - new Date(w.start_datetime)) / 60000);
 }
@@ -602,17 +644,34 @@ async function renderCardio() {
 		return;
 	}
 
-	const weeks = Array.from({ length: CARDIO_WEEKS }, (_, i) => shiftDate(from, 7 * i));
-	const minutesByWeek = new Map(weeks.map((w) => [w, 0]));
-	for (const w of data.workouts) {
-		const week = weekStart(w.day);
-		if (minutesByWeek.has(week)) minutesByWeek.set(week, minutesByWeek.get(week) + workoutMinutes(w));
-	}
-	const shortDate = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-	drawLineChart(canvas, weeks.map((w) => ({ x: shortDate(w), y: minutesByWeek.get(w) })), { color: "#7eb8f0", minY: 0 });
+	const select = document.getElementById("cardio-category");
+	select.value = loadCardioCategory();
 
-	const current = data.workouts.filter((w) => w.day >= thisWeek);
-	summary.textContent = `This week: ${minutesByWeek.get(thisWeek)} min across ${current.length} session${current.length === 1 ? "" : "s"} · weekly minutes, last ${CARDIO_WEEKS} weeks`;
+	const weeks = Array.from({ length: CARDIO_WEEKS }, (_, i) => shiftDate(from, 7 * i));
+	const shortDate = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+	const draw = () => {
+		const category = CARDIO_CATEGORIES[select.value];
+		const workouts = category.activities
+			? data.workouts.filter((w) => category.activities.includes(w.activity))
+			: data.workouts;
+
+		const minutesByWeek = new Map(weeks.map((w) => [w, 0]));
+		for (const w of workouts) {
+			const week = weekStart(w.day);
+			if (minutesByWeek.has(week)) minutesByWeek.set(week, minutesByWeek.get(week) + workoutMinutes(w));
+		}
+		drawLineChart(canvas, weeks.map((w) => ({ x: shortDate(w), y: minutesByWeek.get(w) })), { color: "#7eb8f0", minY: 0 });
+
+		const current = workouts.filter((w) => w.day >= thisWeek);
+		summary.textContent = `This week: ${minutesByWeek.get(thisWeek)} min across ${current.length} session${current.length === 1 ? "" : "s"} · weekly minutes, last ${CARDIO_WEEKS} weeks`;
+	};
+
+	select.addEventListener("change", () => {
+		saveCardioCategory(select.value);
+		draw();
+	});
+	draw();
 }
 
 function renderWorkoutListItem(w) {
