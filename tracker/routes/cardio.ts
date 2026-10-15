@@ -44,11 +44,9 @@ export async function listOuraWorkouts(url: URL): Promise<Response> {
 	return jsonResponse({ connected: true, from, to, workouts });
 }
 
-// The first sync imports everything since this date.
-const BACKFILL_FROM = "2020-01-01";
-// Later syncs re-check this many days before the last sync, to catch workouts
-// the ring uploads late.
-const RESYNC_OVERLAP_DAYS = 7;
+// Only the last week is imported. A full-history backfill (hundreds of workouts,
+// oldest first) ran past Deno Deploy's request limit and never reached recent ones.
+const SYNC_WINDOW_DAYS = 7;
 // Page loads trigger a sync; skip it if one ran this recently.
 const MIN_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -61,20 +59,20 @@ function humanizeActivity(activity: string): string {
 
 /**
  * POST /api/oura/sync[?force=1]
- * Imports Oura workouts into the workout log. Each Oura workout is imported
- * at most once, so a deleted import is not re-added.
+ * Imports the last week of Oura workouts into the workout log. Each Oura
+ * workout is imported at most once, so a deleted import is not re-added.
  */
 export async function syncOuraWorkouts(url: URL): Promise<Response> {
 	const client = await getOuraClient();
 	if (!client) return jsonResponse({ connected: false, added: 0 });
 
-	const lastSync = (await kv.get<{ at: number; through: string }>(["oura", "last-sync"])).value;
+	const lastSync = (await kv.get<{ at: number }>(["oura", "last-sync"])).value;
 	if (lastSync && !url.searchParams.has("force") && Date.now() - lastSync.at < MIN_SYNC_INTERVAL_MS) {
 		return jsonResponse({ connected: true, added: 0, skipped: true });
 	}
 
 	const today = new Date().toISOString().split("T")[0];
-	const from = lastSync ? addDays(lastSync.through, -RESYNC_OVERLAP_DAYS) : BACKFILL_FROM;
+	const from = addDays(today, -SYNC_WINDOW_DAYS);
 	const workouts = await fetchOuraWorkouts(client, from, addDays(today, 1));
 
 	// readiness for each workout's day, fetched once for the whole range
@@ -108,6 +106,6 @@ export async function syncOuraWorkouts(url: URL): Promise<Response> {
 		if (inserted) added++;
 	}
 
-	await kv.set(["oura", "last-sync"], { at: Date.now(), through: today });
+	await kv.set(["oura", "last-sync"], { at: Date.now() });
 	return jsonResponse({ connected: true, added, checked: workouts.length, from });
 }
