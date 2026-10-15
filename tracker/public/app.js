@@ -22,14 +22,20 @@ const state = {
 	programDay: "A",
 };
 
+// Dates are the user's local calendar day. toISOString() would give the UTC day,
+// which rolls over to tomorrow in the evening in US time zones.
+function localISO(d) {
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function todayISO() {
-	return new Date().toISOString().split("T")[0];
+	return localISO(new Date());
 }
 
 function shiftDate(iso, days) {
 	const d = new Date(`${iso}T00:00:00`);
 	d.setDate(d.getDate() + days);
-	return d.toISOString().split("T")[0];
+	return localISO(d);
 }
 
 function formatDateLabel(iso) {
@@ -68,7 +74,7 @@ function drawLineChart(canvas, points, opts = {}) {
 
 	const ys = points.map((p) => p.y);
 	let minY = opts.minY ?? Math.min(...ys);
-	let maxY = Math.max(...ys);
+	let maxY = Math.max(...ys, opts.goal ?? -Infinity);
 	if (minY === maxY) {
 		minY -= 1;
 		maxY += 1;
@@ -94,6 +100,21 @@ function drawLineChart(canvas, points, opts = {}) {
 		ctx.stroke();
 		const value = maxY - ((maxY - minY) / steps) * i;
 		ctx.fillText(value.toFixed(value !== 0 && Math.abs(value) < 10 ? 1 : 0), 4, y + 3);
+	}
+
+	// goal line
+	if (opts.goal != null) {
+		ctx.save();
+		ctx.setLineDash([5, 4]);
+		ctx.strokeStyle = "#9aa1ac";
+		ctx.beginPath();
+		ctx.moveTo(padding.left, yFor(opts.goal));
+		ctx.lineTo(padding.left + w, yFor(opts.goal));
+		ctx.stroke();
+		ctx.fillStyle = "#9aa1ac";
+		ctx.textAlign = "right";
+		ctx.fillText(`goal ${opts.goal}`, padding.left + w, yFor(opts.goal) - 4);
+		ctx.restore();
 	}
 
 	// line
@@ -300,17 +321,11 @@ async function renderDashboard() {
 				<button class="secondary" style="margin-top:0.6rem" onclick="setTab('workouts')">Open workouts →</button>
 			</div>`;
 
-		const totals = data.macroTotals;
 		const macrosCard = `
 			<div class="card">
-				<h2>Macros</h2>
-				<div class="grid">
-					<div class="stat"><div class="value">${Math.round(totals.calories)}</div><div class="label">Calories</div></div>
-					<div class="stat"><div class="value">${Math.round(totals.protein)}g</div><div class="label">Protein</div></div>
-					<div class="stat"><div class="value">${Math.round(totals.carbs)}g</div><div class="label">Carbs</div></div>
-					<div class="stat"><div class="value">${Math.round(totals.fat)}g</div><div class="label">Fat</div></div>
-				</div>
-				<button class="secondary" style="margin-top:0.6rem" onclick="setTab('macros')">Open macros →</button>
+				<h2>Protein</h2>
+				${renderProteinProgressHtml(data.macroTotals.protein)}
+				<button class="secondary" style="margin-top:0.6rem" onclick="setTab('macros')">Log protein →</button>
 			</div>`;
 
 		container.innerHTML = ouraCard + journalCard + workoutsCard + macrosCard;
@@ -690,7 +705,24 @@ async function renderExerciseChart() {
 	drawLineChart(canvas, points, { color: "#6ee7b7" });
 }
 
-// ---------- macros ----------
+// ---------- protein ----------
+// Daily protein floor. The tab still uses the macros API; only protein is logged now.
+const PROTEIN_GOAL = 140;
+
+function renderProteinProgressHtml(grams) {
+	const total = Math.round(grams ?? 0);
+	const met = total >= PROTEIN_GOAL;
+	const pct = Math.min(100, (total / PROTEIN_GOAL) * 100);
+	return `
+		<div class="protein-progress ${met ? "met" : ""}">
+			<div class="protein-progress-numbers">
+				<span><strong>${total}g</strong> / ${PROTEIN_GOAL}g</span>
+				<span class="muted">${met ? "Goal met ✓" : `${PROTEIN_GOAL - total}g to go`}</span>
+			</div>
+			<div class="protein-bar"><div style="width:${pct}%"></div></div>
+		</div>`;
+}
+
 async function renderMacros() {
 	const container = document.getElementById("view-macros");
 	container.innerHTML = `<div class="muted">Loading…</div>`;
@@ -704,59 +736,67 @@ async function renderMacros() {
 	]);
 
 	const todays = entries.filter((e) => e.date === state.date);
+	const todayTotal = todays.reduce((sum, e) => sum + (e.protein ?? 0), 0);
+	const loggedDays = summary.filter((s) => s.protein > 0);
+	const daysMet = loggedDays.filter((s) => s.protein >= PROTEIN_GOAL).length;
 
 	container.innerHTML = `
 		<div class="card">
-			<h2>Log food for ${formatDateLabel(state.date)}</h2>
-			<div class="form-row">
-				<label>Label <input type="text" id="macro-label" placeholder="Lunch" /></label>
-				<label>Calories <input type="number" id="macro-calories" /></label>
-				<label>Protein (g) <input type="number" id="macro-protein" /></label>
-				<label>Carbs (g) <input type="number" id="macro-carbs" /></label>
-				<label>Fat (g) <input type="number" id="macro-fat" /></label>
+			<h2>Protein for ${formatDateLabel(state.date)}</h2>
+			${renderProteinProgressHtml(todayTotal)}
+			<div class="form-row" style="margin-top:0.9rem;">
+				<label>Food <input type="text" id="macro-label" placeholder="Chicken + rice" /></label>
+				<label>Protein (g) <input type="number" id="macro-protein" inputmode="decimal" /></label>
 			</div>
 			<label style="margin-top:0.6rem">Notes <input type="text" id="macro-notes" /></label>
-			<button class="primary" id="save-macro" style="margin-top:0.75rem;">Add entry</button>
+			<button class="primary" id="save-macro" style="margin-top:0.75rem;">Add protein</button>
 		</div>
 
 		<div class="card">
-			<h2>Today's entries</h2>
+			<h2>Entries</h2>
 			${todays.length
 				? todays.map((m) => `
 					<div class="list-item">
 						<div class="list-item-header">
 							<span class="title">${escapeHtml(m.label || "Entry")}</span>
-							<button class="icon-btn" data-delete-macro="${m.id}">Delete</button>
+							<span>
+								<strong>${Math.round(m.protein ?? 0)}g</strong>
+								<button class="icon-btn" data-delete-macro="${m.id}">Delete</button>
+							</span>
 						</div>
-						<div class="muted">${m.calories ?? 0} cal · P${m.protein ?? 0}g · C${m.carbs ?? 0}g · F${m.fat ?? 0}g</div>
 						${m.notes ? `<div class="muted">${escapeHtml(m.notes)}</div>` : ""}
 					</div>`).join("")
 				: `<div class="empty-state">Nothing logged for this day yet.</div>`}
 		</div>
 
 		<div class="card">
-			<h2>Calories — last 30 days</h2>
-			<canvas class="chart" id="macro-chart"></canvas>
+			<h2>Protein — last 30 days</h2>
+			<div class="muted">${loggedDays.length
+				? `Hit ${PROTEIN_GOAL}g on ${daysMet} of ${loggedDays.length} logged day${loggedDays.length === 1 ? "" : "s"}`
+				: "No protein logged in the last 30 days."}</div>
+			<canvas class="chart" id="macro-chart" style="margin-top:0.75rem;"></canvas>
 		</div>
 	`;
 
 	drawLineChart(
 		document.getElementById("macro-chart"),
-		summary.map((s) => ({ x: formatDateLabel(s.date), y: s.calories })),
-		{ color: "#fbbf24" },
+		loggedDays.map((s) => ({ x: formatDateLabel(s.date), y: s.protein })),
+		{ color: "#6ee7b7", minY: 0, goal: PROTEIN_GOAL },
 	);
 
 	container.querySelector("#save-macro").addEventListener("click", async () => {
+		const protein = Number(container.querySelector("#macro-protein").value);
+		if (!protein) {
+			toast("Enter grams of protein");
+			return;
+		}
 		try {
 			await api(`/api/macros`, {
 				method: "POST",
 				body: JSON.stringify({
 					date: state.date,
 					label: container.querySelector("#macro-label").value || null,
-					calories: Number(container.querySelector("#macro-calories").value) || null,
-					protein: Number(container.querySelector("#macro-protein").value) || null,
-					carbs: Number(container.querySelector("#macro-carbs").value) || null,
-					fat: Number(container.querySelector("#macro-fat").value) || null,
+					protein,
 					notes: container.querySelector("#macro-notes").value || null,
 				}),
 			});
