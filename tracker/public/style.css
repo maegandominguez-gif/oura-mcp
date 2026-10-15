@@ -186,6 +186,23 @@ main {
 	font-weight: 700;
 }
 
+.protein-progress-numbers {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 0.4rem;
+}
+.protein-progress-numbers strong { font-size: 1.5rem; }
+.protein-bar {
+	height: 10px;
+	border-radius: 999px;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	overflow: hidden;
+}
+.protein-bar > div { height: 100%; background: var(--warn); transition: width 0.3s; }
+.protein-progress.met .protein-bar > div { background: var(--accent); }
+
 .oura-group + .oura-group { margin-top: 1rem; }
 .oura-group .grid { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 0.5rem; }
 .oura-group .stat .value { font-size: 1.2rem; }
