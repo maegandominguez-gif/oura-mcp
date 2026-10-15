@@ -198,6 +198,7 @@ export class OuraApi {
 	async getWorkouts(
 		startDate?: Date,
 		endDate?: Date,
+		nextToken?: string | null,
 	): Promise<WorkoutResponse> {
 		if (!startDate) {
 			startDate = new Date(new Date().setDate(new Date().getDate() - 7)); // Default to last week for workouts
@@ -209,6 +210,7 @@ export class OuraApi {
 		const filters = new URLSearchParams();
 		filters.append("start_date", formatDateForOuraAPI(startDate));
 		filters.append("end_date", formatDateForOuraAPI(endDate));
+		if (nextToken) filters.append("next_token", nextToken);
 
 		const workouts = await this._request<WorkoutResponse>("/usercollection/workout", {}, filters);
 

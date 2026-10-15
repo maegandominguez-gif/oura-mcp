@@ -210,24 +210,32 @@ function humanizeActivity(activity) {
 	return words[0].toUpperCase() + words.slice(1);
 }
 
-function renderOuraWorkoutHtml(w, withDate = false) {
-	const start = new Date(w.start_datetime);
-	const minutes = workoutMinutes(w);
-	const time = (withDate ? `${formatDateLabel(w.day)}, ` : "") + start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-	const details = [
-		`${minutes} min`,
-		w.calories != null ? `${Math.round(w.calories)} cal` : null,
-		w.distance >= 400 ? `${(w.distance / 1609.34).toFixed(1)} mi` : null, // skip incidental distance on classes
-		w.intensity,
+// "45 min · 226 cal · 1.6 mi · moderate" for a workout imported from Oura
+function ouraDetailsText(info) {
+	return [
+		`${info.minutes} min`,
+		info.calories != null ? `${Math.round(info.calories)} cal` : null,
+		info.distance >= 400 ? `${(info.distance / 1609.34).toFixed(1)} mi` : null, // skip incidental distance on classes
+		info.intensity,
+		info.autodetected ? "auto-detected" : null,
 	].filter(Boolean).join(" · ");
-	return `
-		<div class="list-item">
-			<div class="list-item-header">
-				<span class="title">${escapeHtml(w.label || humanizeActivity(w.activity))}</span>
-				<span class="muted">${time}</span>
-			</div>
-			<div class="muted">${escapeHtml(details)}${w.source === "autodetected" ? " · auto-detected" : ""}</div>
-		</div>`;
+}
+
+// Imports new Oura workouts into the log, then re-renders if any arrived.
+// Rate-limited here as well as on the server, so a re-render can't loop.
+let ouraSyncStartedAt = 0;
+async function syncOuraWorkouts(rerender) {
+	if (Date.now() - ouraSyncStartedAt < 60_000) return;
+	ouraSyncStartedAt = Date.now();
+	try {
+		const result = await api("/api/oura/sync", { method: "POST" });
+		if (result.added) {
+			toast(`Synced ${result.added} workout${result.added === 1 ? "" : "s"} from Oura`);
+			rerender();
+		}
+	} catch {
+		// Oura unavailable; try again on a later page load
+	}
 }
 
 function renderOuraCard(oura) {
@@ -279,6 +287,7 @@ function renderOuraCard(oura) {
 async function renderDashboard() {
 	const container = document.getElementById("view-dashboard");
 	container.innerHTML = `<div class="muted">Loading…</div>`;
+	syncOuraWorkouts(() => state.tab === "dashboard" && renderDashboard());
 
 	try {
 		const data = await api(`/api/dashboard?date=${state.date}`);
@@ -308,16 +317,12 @@ async function renderDashboard() {
 				<button class="secondary" style="margin-top:0.6rem" onclick="setTab('journal')">Open journal →</button>
 			</div>`;
 
-		const ouraWorkouts = (oura.workouts ?? []).filter((w) => w.activity !== "houseWork");
 		const workoutsCard = `
 			<div class="card">
 				<h2>Workouts</h2>
 				${data.workouts.length
-					? data.workouts.map((w) => `<div class="list-item"><div class="list-item-header"><span class="title">${escapeHtml(w.name)}</span><span class="muted">${w.exercises.length} exercise${w.exercises.length === 1 ? "" : "s"}</span></div></div>`).join("")
+					? data.workouts.map((w) => `<div class="list-item"><div class="list-item-header"><span class="title">${escapeHtml(w.name)}${w.oura ? ` <span class="pill">Oura</span>` : ""}</span><span class="muted">${w.oura ? escapeHtml(ouraDetailsText(w.oura)) : `${w.exercises.length} exercise${w.exercises.length === 1 ? "" : "s"}`}</span></div></div>`).join("")
 					: `<div class="empty-state">No workout logged for this day.</div>`}
-				${ouraWorkouts.length
-					? `<div class="oura-group-title" style="margin-top:0.75rem;">From Oura</div>${ouraWorkouts.map(renderOuraWorkoutHtml).join("")}`
-					: ""}
 				<button class="secondary" style="margin-top:0.6rem" onclick="setTab('workouts')">Open workouts →</button>
 			</div>`;
 
@@ -435,6 +440,7 @@ async function renderWorkouts() {
 	if (!workoutDraft) workoutDraft = newWorkoutDraft();
 	const container = document.getElementById("view-workouts");
 	container.innerHTML = `<div class="muted">Loading…</div>`;
+	syncOuraWorkouts(() => state.tab === "workouts" && renderWorkouts());
 
 	const [workouts, exerciseNames] = await Promise.all([
 		api(`/api/workouts`),
@@ -445,6 +451,12 @@ async function renderWorkouts() {
 	container.innerHTML = `
 		<div class="card">
 			<h2>Log a workout</h2>
+			<div class="program-start">
+				<span class="muted">Start from program</span>
+				<div class="program-start-buttons">
+					${["A", "B", "C"].map((id) => `<button class="secondary" data-start-day="${id}">Day ${id}</button>`).join("")}
+				</div>
+			</div>
 			<div class="form-row">
 				<label>Date <input type="text" id="workout-date" value="${workoutDraft.date}" /></label>
 				<label>Name <input type="text" id="workout-name" placeholder="Push Day" value="${escapeHtml(workoutDraft.name)}" /></label>
@@ -470,7 +482,6 @@ async function renderWorkouts() {
 			<h2>Cardio from Oura</h2>
 			<div class="muted" id="cardio-summary">Loading…</div>
 			<canvas class="chart" id="cardio-chart" style="margin-top:0.75rem;"></canvas>
-			<div id="cardio-list" style="margin-top:0.75rem;"></div>
 		</div>
 
 		<div class="card">
@@ -486,6 +497,18 @@ async function renderWorkouts() {
 	container.querySelector("#workout-date").addEventListener("input", (e) => (workoutDraft.date = e.target.value));
 	container.querySelector("#workout-name").addEventListener("input", (e) => (workoutDraft.name = e.target.value));
 	container.querySelector("#workout-notes").addEventListener("input", (e) => (workoutDraft.notes = e.target.value));
+
+	container.querySelectorAll("[data-start-day]").forEach((btn) => {
+		btn.addEventListener("click", async () => {
+			const hasEntries = workoutDraft.exercises.some((e) => e.name.trim() || e.sets.some((s) => s.weight !== "" || s.rpe !== ""));
+			if (hasEntries && !confirm("Replace what you've entered with this program day?")) return;
+			const program = await loadProgram();
+			const day = program.days.find((d) => d.id === btn.dataset.startDay);
+			workoutDraft = buildDraftFromProgramDay(day, await loadProgression(day));
+			renderWorkouts();
+			toast(`Day ${day.id} loaded with today's targets. Log RPE on every set.`);
+		});
+	});
 
 	container.querySelector("#add-exercise").addEventListener("click", () => {
 		workoutDraft.exercises.push({ name: "", sets: [{ reps: "", weight: "", unit: "lb", rpe: "" }] });
@@ -547,7 +570,6 @@ async function renderWorkouts() {
 }
 
 const CARDIO_WEEKS = 8;
-const CARDIO_LIST_PREVIEW = 8;
 
 function workoutMinutes(w) {
 	return Math.round((new Date(w.end_datetime) - new Date(w.start_datetime)) / 60000);
@@ -563,7 +585,6 @@ function weekStart(iso) {
 async function renderCardio() {
 	const summary = document.getElementById("cardio-summary");
 	const canvas = document.getElementById("cardio-chart");
-	const list = document.getElementById("cardio-list");
 
 	const thisWeek = weekStart(state.date);
 	const from = shiftDate(thisWeek, -7 * (CARDIO_WEEKS - 1));
@@ -592,25 +613,13 @@ async function renderCardio() {
 
 	const current = data.workouts.filter((w) => w.day >= thisWeek);
 	summary.textContent = `This week: ${minutesByWeek.get(thisWeek)} min across ${current.length} session${current.length === 1 ? "" : "s"} · weekly minutes, last ${CARDIO_WEEKS} weeks`;
-
-	const renderList = (showAll) => {
-		const shown = showAll ? data.workouts : data.workouts.slice(0, CARDIO_LIST_PREVIEW);
-		list.innerHTML = shown.length
-			? shown.map((w) => renderOuraWorkoutHtml(w, true)).join("") +
-				(!showAll && data.workouts.length > shown.length
-					? `<button class="secondary" id="cardio-show-all" style="margin-top:0.5rem;">Show all ${data.workouts.length}</button>`
-					: "")
-			: `<div class="empty-state">No Oura workouts in the last ${CARDIO_WEEKS} weeks.</div>`;
-		list.querySelector("#cardio-show-all")?.addEventListener("click", () => renderList(true));
-	};
-	renderList(false);
 }
 
 function renderWorkoutListItem(w) {
 	return `
 		<div class="list-item">
 			<div class="list-item-header">
-				<span class="title">${escapeHtml(w.name)}</span>
+				<span class="title">${escapeHtml(w.name)}${w.oura ? ` <span class="pill">Oura</span>` : ""}</span>
 				<span>
 					<span class="muted">${formatDateLabel(w.date)}${w.readiness != null ? ` · Readiness ${w.readiness}` : ""}</span>
 					<button class="icon-btn" data-delete-workout="${w.id}">Delete</button>
@@ -622,6 +631,7 @@ function renderWorkoutListItem(w) {
 					${e.sets.map((s) => `${s.reps ?? "?"}×${s.weight ?? "?"}${s.unit}${s.rpe != null ? ` @${s.rpe}` : ""}`).join(", ") || "no sets logged"}
 				</div>
 			`).join("")}
+			${w.oura ? `<div class="muted">${escapeHtml(ouraDetailsText(w.oura))}</div>` : ""}
 			${w.notes ? `<div class="muted">${escapeHtml(w.notes)}</div>` : ""}
 		</div>`;
 }

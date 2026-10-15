@@ -110,11 +110,6 @@ nav.tabs.scrolled-end { mask-image: none; }
 	.date-nav input[type="date"] { flex: 1; min-width: 0; }
 	nav.tabs { padding: 0.25rem 1rem 0; }
 	nav.tabs button { padding: 0.5rem 0.75rem; }
-
-	/* set rows: five fields in ~280px, so tighten padding and give weight the most room */
-	.set-row { grid-template-columns: 1.4rem 1fr 1.25fr 3.4rem 1fr 1.6rem; gap: 0.3rem; }
-	.set-row input, .set-row select { padding: 0.45rem 0.4rem; font-size: 0.88rem; }
-	.set-row .icon-btn { padding: 0.2rem; }
 }
 
 /* spin arrows eat most of a narrow number field and aren't useful for logging sets */
@@ -185,6 +180,18 @@ main {
 	font-size: 1.5rem;
 	font-weight: 700;
 }
+
+.program-start {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-bottom: 0.9rem;
+	padding-bottom: 0.9rem;
+	border-bottom: 1px solid var(--border);
+}
+.program-start-buttons { display: flex; gap: 0.4rem; }
 
 .protein-progress-numbers {
 	display: flex;
@@ -306,6 +313,14 @@ label {
 	grid-template-columns: 2rem 1fr 1fr 1fr 1fr auto;
 	gap: 0.4rem;
 	align-items: center;
+}
+
+/* phones: five fields in ~290px, so tighten padding and give weight the most room
+   (kept after the base rule so it wins) */
+@media (max-width: 600px) {
+	.set-row { grid-template-columns: 1.4rem 0.9fr 1.5fr 3.4rem 0.9fr 1.6rem; gap: 0.3rem; }
+	.set-row input, .set-row select { padding: 0.45rem 0.4rem; font-size: 0.88rem; }
+	.set-row .icon-btn { padding: 0.2rem; }
 }
 
 .exercise-block {
